@@ -5,7 +5,6 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/RobTillaart/MS5611/blob/master/LICENSE)
 [![GitHub release](https://img.shields.io/github/release/mikeedudee/MS5611-Mike-Refactored.svg?maxAge=3600)](https://github.com/mikeedudee/MS5611-Mike-Refactored/releases)
-[![PlatformIO Registry](https://badges.registry.platformio.org/packages/robtillaart/library/MS5611.svg)](https://registry.platformio.org/libraries/robtillaart/MS5611)
 
 
 
@@ -38,7 +37,7 @@ Refactored and Enhanced version of the MS5611 Pressure & Temperature Sensor Ardu
 ```
 
 ## Description
-This library only implements the I2C interface. This refactored and enhanced library originally came from the library of Korneliusz Jarzebski. I just decided to do some structure optimization and refactoring while adding and enhancing some features and API's etc. Some functions and features come from or is inspired from Rob Tillaart MS5611 library integrated into this library with a few tweaks.
+This library only implements the I2C interface. This refactored and enhanced library is originally from the library of Korneliusz Jarzebski. I just decided to do some restructuring, optimization, and refactoring while adding enhancements and some features and API calls, etc. Some functions and features come from or are inspired by Rob Tillaart MS5611 library, integrated into this library with a few tweaks.
 
 The device default address is 0x76 or 0x77, depending on the CSB/CSO pin.
 
