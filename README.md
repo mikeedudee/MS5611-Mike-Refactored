@@ -81,14 +81,14 @@ Some numbers from datasheet, page 3 MAX column rounded up. (see #23)
 
 You can install this library via the Arduino Library Manager by importing it manually:
 
-1. Download or clone this repository:
-   ```bash
-   git clone https://github.com/mikeedudee/MS5611-Mike-Refactored.git
-   ```
+1. Download this repository as a zip.
+2. Click "sketch" drop-down button
+3. Select "Include Library"
+4. Then, click "Add .ZIP Library..."
    
 ---
 
-### 2. **Example Usage**
+### **Example Usage**
 Provide a working usage snippet and brief explanation:
 
 ## Basic Example
