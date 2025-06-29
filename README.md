@@ -82,8 +82,8 @@ Some numbers from datasheet, page 3 MAX column rounded up. (see #23)
 You can install this library via the Arduino Library Manager by importing it manually:
 
 1. Download this repository as a zip.
-2. In the Arduino IDE, (upper-left) click the "Sketch" drop-down button
-3. Select "Include Library"
+2. In the Arduino IDE, (upper-left) click the "Sketch" drop-down button.
+3. Select "Include Library".
 4. Then, click "Add .ZIP Library..."
    
 ---
