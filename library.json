@@ -1,5 +1,5 @@
 {
-  "name": "MS5611-Library-Mike-Refactored",
+  "name": "MS5611-Mike-Refactored",
   "keywords": "MS5611, pressure, temperature, i2c",
   "description": "Refactored and Enhanced version of the MS5611 Pressure & Temperature Sensor Arduino Library.",
   "repository": {
