@@ -108,7 +108,7 @@ void setup() {
     while (1);
   }
 
-  ms5611.setOversampling(MS5611::Oversampling::HIGH_RES);
+  ms5611.setOversampling(HIGH_RES);
 }
 
 void loop() {
