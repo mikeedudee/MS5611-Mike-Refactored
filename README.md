@@ -38,7 +38,7 @@ Refactored and Enhanced version of the MS5611 Pressure & Temperature Sensor Ardu
 ```
 
 ## Description
-This library only implements the I2C interface. This refactored and enhanced library is originally from the library of Korneliusz Jarzebski. I just decided to do some restructuring, optimization, and refactoring while adding enhancements and some features and API calls, etc. Some functions and features come from or are inspired by Rob Tillaart MS5611 library, integrated into this library with a few tweaks.
+This library exclusively supports the I2C interface. It is a refactored and enhanced version originally based on the library by Korneliusz Jarzebski. Structural improvements, optimizations, and additional features have been incorporated, including expanded API support. Several functions and design elements are adapted from or inspired by Rob Tillaart's MS5611 library, integrated with further modifications for improved performance and usability.
 
 The device default address is 0x76 or 0x77, depending on the CSB/CSO pin.
 
