@@ -57,4 +57,38 @@ MS5611.cpp >>
   * **Offset application**: user offsets are now applied at the end of `readPressure()` and `readTemperature()`  
   * **Constructor implementations**:  
       - default ctor binds to `Wire`, uses default address  
-      - custom ctor takes user-supplied `TwoWire &` and address  
+      - custom ctor takes user-supplied `TwoWire &` and address
+   
+MS5611 Library Mike Refactored Version 1.0.4_exp_build_29072025 | 29 Jun 2025
+======================================================================
+### 🛠 FIXES
+- Corrected `read()` API behavior: `readPressure()` now returns the final computed value, not binary output.
+- Simplified resolution access:
+  - Changed from `MS5611_RESOLUTION::ULTRA_HIGH_RES` ➝ `ULTRA_HIGH_RES` (no need to prefix with `MS5611::`).
+- Resolved `const` member function issue where it could not access external members.
+- General bug fixes and stability improvements.
+
+---
+
+### ➕ ADDITIONS
+- `getAddress()` — Returns the I2C address of the device.
+- `getDeviceID()` — Returns the device ID.
+- `getPROM()` — Access to PROM calibration coefficients.
+- `getCRC()` — Computes and returns CRC from PROM.
+- Automatic correction for anomalous pressure values.
+- Added multiple example sketches to illustrate advanced usage.
+
+---
+
+### 🔁 CHANGES
+- Revised oversampling resolution settings:
+  | Setting           | Resolution | Delay (ms) |
+  |------------------|------------|------------|
+  | ULTRA_HIGH_RES   | Highest    | 10 ms      |
+  | HIGH_RES         | High       | 5 ms       |
+  | STANDARD         | Medium     | 3 ms _(Default / Backward Compatible)_ |
+  | LOW_POWER        | Low        | 2 ms       |
+  | ULTRA_LOW_POWER  | Lowest     | 1 ms       |
+
+- **Header Change (`MS5611.h`)**:
+  - Oversampling enumeration moved *outside* the main class to enable global access without needing a class prefix.
