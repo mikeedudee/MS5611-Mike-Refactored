@@ -70,7 +70,7 @@ void loop()
 
   for (int i = 0; i < 3; i++)
   {
-    if (first[i] && second[i] == NAN || first[i] && second[i] == INT32_MIN)
+    if ((first[i] && second[i] == NAN) || (first[i] && second[i] == INT32_MIN))
     {
       Serial.print("Error reading sensor data at index: ");
       Serial.println(i);
