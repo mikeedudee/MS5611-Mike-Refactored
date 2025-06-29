@@ -132,6 +132,10 @@ void loop() {
 | `readRawTemperature()` | Return raw reading of the sensor temperature |
 | `setOversampling(mode)` | Sets oversampling (see table above) |
 | `getOversampling()` | Returns current oversampling setting |
+| `getAltitude()` | Returns computed altitude in meters |
+| `getSeaLevel()` | Computes sea level pressure in Pascal |
+| `getManufacturer()` | returns manufacturer private info | 
+| `getSerialCode()` | returns serialCode from the PROM\[7] minus the CRC |
 
 ## Contributing
 
