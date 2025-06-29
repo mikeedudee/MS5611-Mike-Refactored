@@ -143,6 +143,9 @@ void loop() {
 | `getPROM()` | Read PROM coefficient at specified index (0-6)  |
 | `getCRC()` | Calculate CRC4 checksum for the PROM coefficients |
 
+## NOTE
+**ALWAYS REFER TO THE SENSOR'S DATASHEET**
+
 ## Contributing
 
 Contributions, issues, and feature requests are welcome.  
