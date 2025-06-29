@@ -76,7 +76,7 @@ There are 5 oversampling settings, each corresponding to a different number of m
   // or
   ms5611.begin(ULTRA_HIGH_RES))
   ```
-`Setting the Oversample resolution or using it during .begin is usually the same,  the difference is that the "setOversampling()" API function is dynamic—can be called anywhere setting the sensors adapt to various mission profiles or requirements.`
+Setting the Oversample resolution or using it during .begin is usually the same,  the difference is that the "setOversampling()" API function is dynamic—can be called anywhere setting the sensors adapt to various mission profiles or requirements.
 
 ## Installation
 
