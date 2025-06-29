@@ -1,11 +1,14 @@
 /*
-  MS5611 Barometric Pressure & Temperature Sensor. Output for MS5611_processing.pde
+  MS5611 Barometric Pressure & Temperature Sensor. Output for processing.pde
   Read more: http://www.jarzebski.pl/arduino/czujniki-i-sensory/czujnik-cisnienia-i-temperatury-ms5611.html
   GIT: https://github.com/jarzebski/Arduino-MS5611
   Web: http://www.jarzebski.pl
   (c) 2014 by Korneliusz Jarzebski
 
-  (c) 2025 by Francis Mike John Camogao [Refactor]
+// MODIFICATION: FRANCIS MIKE JOHN CAMOGAO
+//         DATE: 29 JUN 2025
+//          URL: https://github.com/mikeedudee/MS5611-Mike-Refactored.git
+
   This code is licensed under the MIT License (MIT).
   See LICENSE file for more details.
   This example reads the MS5611 sensor and prints the temperature, pressure, and altitude.
@@ -27,12 +30,12 @@ void setup()
   Serial.begin(115200);
 
   // Initialize MS5611 sensor
-  // Ultra high resolution: MS5611_ULTRA_HIGH_RES
-  // (default) High resolution: MS5611_HIGH_RES
-  // Standard: MS5611_STANDARD
-  // Low power: MS5611_LOW_POWER
-  // Ultra low power: MS5611_ULTRA_LOW_POWER
-  while(!ms5611.begin(MS5611::Oversampling::MS5611_ULTRA_HIGH_RES))
+  // Ultra high resolution: ULTRA_HIGH_RES
+  // (default) High resolution: HIGH_RES
+  // Standard: STANDARD
+  // Low power: LOW_POWER
+  // Ultra low power: ULTRA_LOW_POWER
+  while(!ms5611.begin(ULTRA_HIGH_RES))
   {
     delay(500);
   }

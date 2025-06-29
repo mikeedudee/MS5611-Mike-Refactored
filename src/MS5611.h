@@ -3,7 +3,8 @@
 The MIT License
 
 Copyright (c) 2014-2023 Korneliusz Jarzębski
-Copyright (c) 2025 Francis Mike John Camogao [Refactor]
+Copyright (c) 2023–2025 Rob Tillaart
+Copyright (c) 2025 Francis Mike John Camogao [Refactor/Enhancements]
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,6 +26,24 @@ SOFTWARE.
 
 */
 
+//  BREAKOUT  MS5611  aka  GY63 - see datasheet
+//
+//  SPI    I2C
+//              +--------+
+//  VCC    VCC  | o      |
+//  GND    GND  | o      |
+//         SCL  | o      |
+//  SDI    SDA  | o      |
+//  CSO         | o      |
+//  SDO         | o L    |   L = led
+//          PS  | o    O |   O = opening  PS = protocol select
+//              +--------+
+//
+//  PS to VCC  ==>  I2C  (GY-63 board has internal pull up, so not needed)
+//  PS to GND  ==>  SPI
+//  CS to VCC  ==>  0x76
+//  CS to GND  ==>  0x77
+
 #pragma once // Ensures this header file is included only once
 // Project name: MS5611 Sensor Library
 
@@ -32,18 +51,22 @@ SOFTWARE.
 #include <Arduino.h>
 #include <Wire.h>
 
-class MS5611 { 
-    public:
+#define MS5611_LIB_VERSION          (F("1.0.4_exp_build_29072025"))
+#define ENVIRONMENT_COMPT           (F("Teensy 4.1. Incompatibility might occur with other boards."))
+#define MS5611_READ_OK              0
+
         // Enum for oversampling rates; these control the resolution and power consumption
         // Higher values yield better resolution but consume more power and take longer to read
-        enum class Oversampling : uint8_t {
-            MS5611_ULTRA_HIGH_RES   = 0x08,
-            MS5611_HIGH_RES         = 0x06,
-            MS5611_STANDARD         = 0x04,
-            MS5611_LOW_POWER        = 0x02,
-            MS5611_ULTRA_LOW_POWER  = 0x00
+        enum Oversampling : uint8_t {
+            ULTRA_HIGH_RES   = 0x08,
+            HIGH_RES         = 0x06,
+            STANDARD         = 0x04,
+            LOW_POWER        = 0x02,
+            ULTRA_LOW_POWER  = 0x00
         };
 
+class MS5611 { 
+    public:
         /// Scaling math modes
         enum class MathMode : uint8_t {
             Datasheet = 0,
@@ -56,7 +79,7 @@ class MS5611 {
         MS5611(uint8_t address, TwoWire &wirePort = Wire);
 
         // Reset, read PROM (+CRC), choose OSR & math mode
-        bool begin(Oversampling osr   = Oversampling::MS5611_HIGH_RES,
+        bool begin(Oversampling osr   = HIGH_RES,
                    MathMode     math  = MathMode::Datasheet);
 
         // Raw ADC reads (blocking)
@@ -65,32 +88,44 @@ class MS5611 {
 
         // Calibrated values
         double  readTemperature(bool compensate = false) const;
-        int32_t readPressure   (bool compensate = false) const;
+        float   readPressure   (bool compensate = false) const;
 
         // Helpers
         static double getAltitude(double pressure, double seaLevelPressure = 101325.0);
         static double getSeaLevel(double pressure, double altitude);
 
         // Offsets & IDs
-        void     setPressureOffset   (int32_t mbar) { pressureOffset_    = mbar; }
-        void     setTemperatureOffset(double degC ) { temperatureOffset_ = degC; }
-        uint32_t getDeviceID         () const       { return deviceID_; }
-        uint16_t getManufacturer     () const;
-        uint16_t getSerialCode       () const;
+        void     setPressureOffset   (int32_t mbar) { pressureOffset_    = mbar; }                  // Set pressure offset in mbar
+        void     setTemperatureOffset(double degC ) { temperatureOffset_ = degC; }                  // Set temperature offset in degrees Celsius
+        uint32_t getDeviceID         () const       { return deviceID_; }                           // Get device ID (XOR of PROM words)
+        uint16_t getManufacturer     () const;                                                      // Declare getManufacturer() const; // Get manufacturer code (first PROM word)
+        uint16_t getSerialCode       () const;                                                      // Declare getSerialCode() const; // Get serial code (last PROM word shifted right by 4 bits)
+        uint16_t getAddress          () const       { return address_; }                            // Get I2C address (0x76 or 0x77)
+            
 
-         // Oversampling introspection
-        void         setOversampling(Oversampling osr) { osr_ = osr; }
-        Oversampling getOversampling()        const    { return osr_; }
-        uint8_t      getOSRCode()             const    { return uint8_t(osr_); }
-        uint16_t     getConvTimeMs()          const    {
+        // Oversampling introspection
+        void         setOversampling(Oversampling osr) { osr_ = osr; }                              // Set oversampling rate
+        Oversampling getOversampling()        const    { return osr_; }                             // Get current oversampling rate
+        uint8_t      getOSRCode()             const    { return static_cast<uint8_t>(osr_); }       // Get OSR code (0-4) for conversion commands
+        uint16_t     getConvTimeMs()          const    {                                            // Get conversion time in milliseconds based on the current OSR
             return MS5611_CONVERSION_TIMEOUT_MS[uint8_t(osr_) >> 1];
         }
 
-
+        // Low-level I2C communication method
+        void        resetSensor();                                      // Send reset over I2C
+        bool        readCalibration();                                  // Read PROM and verify CRC4
+        void        convert(const uint8_t addr, uint8_t bits);          // Start conversion with specified address and bits
+        int         read(uint8_t bits);                                 // Read ADC value with specified oversampling bits  
+        inline int  read() { return read( (uint8_t) HIGH_RES); };       // Default to HIGH_RES
+        uint32_t    readADC();                                          // Read ADC value (24-bit) from the sensor
+        uint16_t    readProm(uint8_t reg);                              // Read PROM register (16-bit) from the sensor
+        int         command(const uint8_t command);                     // Send command to the sensor
+        uint16_t    getProm(uint8_t index);                             // Read PROM coefficient at specified index (0-6)    
+        uint16_t    getCRC();                                           // Calculate CRC4 checksum for the PROM coefficients
 
     private:
         // I2C command and address constants
-        static constexpr uint8_t        MS5611_ADDRESS              = 0x77; // Devuce I2C Address
+        static constexpr uint8_t        MS5611_ADDRESS              = 0x77; // Device I2C Address
         static constexpr uint8_t        MS5611_RESET                = 0x1E; // Reset command code
         static constexpr uint8_t        MS5611_CONVERT_D1           = 0x40; // Base for D1 (pressure) conversion
         static constexpr uint8_t        MS5611_CONVERT_D2           = 0x50; // Base for D2 (temperature) conversion
@@ -100,21 +135,27 @@ class MS5611 {
         // Conversion times (ms) for OSR = 256, 512, 1024, 2048, 4096
         static constexpr uint16_t MS5611_CONVERSION_TIMEOUT_MS[] = { 1, 2, 3, 5, 10 };   // Timeout for conversion in milliseconds  
 
-        TwoWire*        wire_;                  // I2C bus
-        uint8_t         address_;               // I2C address (0x76/0x77)
-        Oversampling    osr_;                   // current OSR
-        MathMode        mathMode_;              // datasheet vs appnote
+        TwoWire*        wire_;                      // I2C bus
+        uint8_t         address_;                   // I2C address (0x76/0x77)
+        Oversampling    osr_;                       // current OSR
+        MathMode        mathMode_;                  // datasheet vs appnote
 
-        uint16_t        cal_[6];                // PROM coefficients
-        int32_t         pressureOffset_;        // user offset in mbar
-        double          temperatureOffset_;     // user offset °C
-        uint32_t        deviceID_;              // XOR of PROM words
+        uint16_t        cal_[6];                    // PROM coefficients
+        int32_t         pressureOffset_;            // user offset in mbar
+        double          temperatureOffset_;         // user offset °C
+        uint32_t        deviceID_;                  // XOR of PROM words
 
-        int64_t OFF2 = 0, SENS2 = 0, TEMP2 = 0;  // second‐order terms
+        int32_t         _temperature;               // Temperature in hundredths of degrees Celsius
+        int32_t         _pressure;                  // Pressure in hundredths of mbar
+        int             _result;                    // Result of the last operation (0 = success, non-zero = error)
+        float           C[7];                       // Calibration coefficients for second-order compensation
+        uint32_t        _lastRead;                  // Timestamp of the last read operation
+        uint32_t        _deviceID;                  // Device ID calculated from the PROM coefficients
+        bool            _compensation;              // Flag to indicate if second-order compensation is applied
 
-        // Low-level I2C communication methods
-        void        resetSensor();                  // Send reset over I2C
-        bool        readCalibration();              // Read PROM and verify CRC4
-        uint16_t    readRegister16(uint8_t reg);    // Read 16-bit register value
-        uint32_t    readRegister24(uint8_t reg);    // Read 24-bit register value
+        int64_t OFF2 = 0, SENS2 = 0, TEMP2 = 0;     // second‐order terms
+        
+        // Low-level I2C communication method
+        uint16_t    readRegister16(uint8_t reg)     const;    // Read 16-bit register value
+        uint32_t    readRegister24(uint8_t reg)     const;    // Read 24-bit register value
 };

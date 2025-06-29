@@ -4,7 +4,7 @@ The MIT License
 
   Copyright (c) 2014–2023 Korneliusz Jarzębski
   Copyright (c) 2023–2025 Rob Tillaart
-  Copyright (c) 2025–2026 Francis “Mike” J. Camogao [Refactor]
+  Copyright (c) 2025–2026 Francis “Mike” J. Camogao [Refactor/Enhancements]
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -26,6 +26,24 @@ SOFTWARE.
 
 */
 
+//  BREAKOUT  MS5611  aka  GY63 - see datasheet
+//
+//  SPI    I2C
+//              +--------+
+//  VCC    VCC  | o      |
+//  GND    GND  | o      |
+//         SCL  | o      |
+//  SDI    SDA  | o      |
+//  CSO         | o      |
+//  SDO         | o L    |   L = led
+//          PS  | o    O |   O = opening  PS = protocol select
+//              +--------+
+//
+//  PS to VCC  ==>  I2C  (GY-63 board has internal pull up, so not needed)
+//  PS to GND  ==>  SPI
+//  CS to VCC  ==>  0x76
+//  CS to GND  ==>  0x77
+
 #include "MS5611.h"
 #include <math.h>
 
@@ -35,7 +53,7 @@ SOFTWARE.
 // The mathMode can be set to either Datasheet or AppNote for different scaling methods
 MS5611::MS5611() : wire_(&Wire)
     , address_(MS5611_ADDRESS)
-    , osr_(Oversampling::MS5611_HIGH_RES)
+    , osr_(HIGH_RES)
     , mathMode_(MathMode::Datasheet)
     , pressureOffset_(0)
     , temperatureOffset_(0)
@@ -48,7 +66,7 @@ MS5611::MS5611() : wire_(&Wire)
 // Allows for flexibility in using different I2C addresses and Wire ports
 MS5611::MS5611(uint8_t address, TwoWire &wirePort) : wire_(&wirePort)
     , address_(address)
-    , osr_(Oversampling::MS5611_HIGH_RES)
+    , osr_(HIGH_RES)
     , mathMode_(MathMode::Datasheet)
     , pressureOffset_(0)
     , temperatureOffset_(0)
@@ -72,7 +90,7 @@ bool MS5611::begin(Oversampling osr, MathMode math) {
 
 // Reads a 16-bit register from the MS5611 sensor
 // Returns UINT16_MAX on failure, otherwise returns the 16-bit value
-uint16_t MS5611::readRegister16(uint8_t reg) {
+uint16_t MS5611::readRegister16(uint8_t reg) const {
     wire_->beginTransmission(address_);
     wire_->write(reg);
 
@@ -90,7 +108,7 @@ uint16_t MS5611::readRegister16(uint8_t reg) {
     return (msb << 8) | lsb;
 }
 
-uint32_t MS5611::readRegister24(uint8_t reg) {
+uint32_t MS5611::readRegister24(uint8_t reg) const {
     wire_->beginTransmission(address_);
     wire_->write(reg);
 
@@ -133,6 +151,68 @@ void MS5611::resetSensor() {
     wire_->write(MS5611_RESET);
     wire_->endTransmission();
     delay(3);
+}
+
+
+int MS5611::read(uint8_t bits)
+{
+  //  VARIABLES NAMES BASED ON DATASHEET
+  //  ALL MAGIC NUMBERS ARE FROM DATASHEET
+
+  convert(MS5611_CONVERT_D1, bits);
+  if (_result) return _result;
+  //  NOTE: D1 and D2 seem reserved in MBED (NANO BLE)
+  uint32_t _D1 = readADC();
+  if (_result) return _result;
+
+  convert(MS5611_CONVERT_D2, bits);
+  if (_result) return _result;
+  uint32_t _D2 = readADC();
+  if (_result) return _result;
+
+  //  Serial.println(_D1);
+  //  Serial.println(_D2);
+
+  //  TEST VALUES - comment lines above
+  //  uint32_t _D1 = 9085466;
+  //  uint32_t _D2 = 8569150;
+
+  //  TEMP & PRESS MATH - PAGE 7/20
+  float dT = _D2 - C[5];
+  _temperature = 2000 + dT * C[6];
+
+  float offset =  C[2] + dT * C[4];
+  float sens = C[1] + dT * C[3];
+
+  if (_compensation)
+  {
+    //  SECOND ORDER COMPENSATION - PAGE 8/20
+    //  COMMENT OUT < 2000 CORRECTION IF NOT NEEDED
+    //  NOTE TEMPERATURE IS IN 0.01 C
+    if (_temperature < 2000)
+    {
+      float T2 = dT * dT * 4.6566128731E-10;
+      float t = (_temperature - 2000) * (_temperature - 2000);
+      float offset2 = 2.5 * t;
+      float sens2 = 1.25 * t;
+      //  COMMENT OUT < -1500 CORRECTION IF NOT NEEDED
+      if (_temperature < -1500)
+      {
+        t = (_temperature + 1500) * (_temperature + 1500);
+        offset2 += 7 * t;
+        sens2 += 5.5 * t;
+      }
+      _temperature -= T2;
+      offset -= offset2;
+      sens -= sens2;
+    }
+    //  END SECOND ORDER COMPENSATION
+  }
+
+  _pressure = (_D1 * sens * 4.76837158205E-7 - offset) * 3.051757813E-5;
+
+  _lastRead = millis();
+  return MS5611_READ_OK;
 }
 
 // Reads the calibration data from the MS5611 sensor's PROM
@@ -204,7 +284,7 @@ uint32_t MS5611::readRawPressure() {
 // This function reads the raw pressure and temperature values, then compensates them using the calibration data
 // If `comp` is true, it applies second-order compensation for temperature effects
 // Returns the compensated pressure in millibars (mbar) or INT32_MIN on failure
-int32_t MS5611::readPressure(bool comp) const {
+float MS5611::readPressure(bool comp) const {
     uint32_t D1 = const_cast<MS5611*>(this)->readRawPressure();
     uint32_t D2 = const_cast<MS5611*>(this)->readRawTemperature();
 
@@ -233,21 +313,21 @@ int32_t MS5611::readPressure(bool comp) const {
     int32_t  TEMP = 2000 + (int64_t(dT) * cal_[5] >> 23);
 
     if (comp && TEMP < 2000) {
-        int64_t d2      = int64_t(TEMP - 2000);
-        int64_t off2    = (5 * d2 * d2) >> 1;
-        int64_t sens2   = (5 * d2 * d2) >> 2;
-
+        int64_t d2    = int64_t(TEMP - 2000);
+        int64_t off2  = (5 * d2 * d2) >> 1;
+        int64_t sens2 = (5 * d2 * d2) >> 2;
         if (TEMP < -1500) {
-        int64_t d22 = int64_t(TEMP + 1500);
-        off2  += 7 * d22 * d22;
-        sens2 += (11 * d22 * d22) >> 1;
+            int64_t d22   = int64_t(TEMP + 1500);
+            off2  += 7 * d22 * d22;
+            sens2 += (11 * d22 * d22) >> 1;
         }
-
         OFF  -= off2;
         SENS -= sens2;
-  }
+    }
+
     int32_t P = int32_t(((D1 * SENS >> 21) - OFF) >> 15);
-    return P + pressureOffset_;
+    float pressure_final = P  + float(pressureOffset_);
+    return pressure_final;
 }
 
 // Reads the temperature from the MS5611 sensor
@@ -283,6 +363,9 @@ double MS5611::getSeaLevel(double p, double alt) {
   return p / pow(1.0 - (alt / 44330.0), 5.255);
 }
 
+
+//// THIS SECTION IS EXPERIMENTAL AND MAY CHANGE IN FUTURE VERSIONS ////
+
 // Returns the device ID, which is a unique identifier for the MS5611 sensor
 // The device ID is calculated as the XOR of the PROM coefficients
 uint16_t MS5611::getManufacturer() const {
@@ -294,4 +377,89 @@ uint16_t MS5611::getManufacturer() const {
 // The serial code is extracted by reading the last PROM word and shifting it right by 4
 uint16_t MS5611::getSerialCode() const {
   return (readRegister16(MS5611_READ_PROM + (7 << 1)) >> 4) & 0x0FFF;
+}
+
+
+void MS5611::convert(const uint8_t addr, uint8_t bits)
+{
+  //  values from page 3 datasheet - MAX column (rounded up)
+  uint16_t del[5] = {600, 1200, 2300, 4600, 9100};
+
+  uint8_t index = bits;
+  if (index < 8) index = 8;
+  else if (index > 12) index = 12;
+  index -= 8;
+  uint8_t offset = index * 2;
+  command(addr + offset);
+
+  uint16_t waitTime = del[index];
+  uint32_t start = micros();
+  //  while loop prevents blocking RTOS
+  while (micros() - start < waitTime)
+  {
+    yield();
+    delayMicroseconds(10);
+  }
+}
+
+uint16_t MS5611::readProm(uint8_t reg)
+{
+  //  last EEPROM register is CRC - Page 13 datasheet.
+  uint8_t promCRCRegister = 7;
+  if (reg > promCRCRegister) return 0;
+
+  uint8_t offset = reg * 2;
+  command(MS5611_READ_PROM + offset);
+  if (_result == 0)
+  {
+    uint8_t length = 2;
+    int bytes = wire_->requestFrom(address_, length);
+    if (bytes >= length)
+    {
+      uint16_t value = wire_->read() * 256;
+      value += wire_->read();
+      return value;
+    }
+    return 0;
+  }
+  return 0;
+}
+
+uint32_t MS5611::readADC()
+{
+  command(MS5611_READ_ADC);
+  if (_result == 0)
+  {
+    uint8_t length = 3;
+    int bytes = wire_->requestFrom(address_, length);
+    if (bytes >= length)
+    {
+      uint32_t value = wire_->read() * 65536UL;
+      value += wire_->read() * 256UL;
+      value += wire_->read();
+      return value;
+    }
+    return 0UL;
+  }
+  return 0UL;
+}
+
+int MS5611::command(const uint8_t command)
+{
+  yield();
+  wire_->beginTransmission(address_);
+  wire_->write(command);
+  _result = wire_->endTransmission();
+  return _result;
+}
+
+//       DEVELOP
+uint16_t MS5611::getProm(uint8_t index)
+{
+  return readProm(index);
+}
+
+uint16_t MS5611::getCRC()
+{
+  return readProm(7) & 0x0F;
 }
