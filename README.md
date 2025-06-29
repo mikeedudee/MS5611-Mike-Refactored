@@ -61,13 +61,13 @@ See the table below and test the example of how to use.
 Some numbers from the datasheet, page 3, MAX column rounded up. (see #23)
 (actual read time differs - see performance sketch)
 
-|        definition       | value | oversampling ratio | resolution (mbar) | notes  |
-|:-----------------------:|:-----:|:------------------:|:-----------------:|:------:|
-| ULTRA_HIGH_RES          |  10   |        4096        |        0.012      |   
-| HIGH_RES                |  5    |        2048        |        0.018      |  Default 
-| STANDARD                |  3    |        1024        |        0.027      |  
-| LOW_POWER               |  2    |        512         |        0.042      |    
-| ULTRA_LOW_POWER         |  1    |        256         |        0.065      |  
+|        definition       | value | oversampling ratio | resolution (mbar) | Resolution | notes  |
+|:-----------------------:|:-----:|:------------------:|:-----------------:|:----------:|:-------:
+| ULTRA_HIGH_RES          |  10   |        4096        |        0.012      |  HIGHEST   |
+| HIGH_RES                |  5    |        2048        |        0.018      |  HIGH      | Default 
+| STANDARD                |  3    |        1024        |        0.027      |  MEDIUM    |
+| LOW_POWER               |  2    |        512         |        0.042      |   LOW      |
+| ULTRA_LOW_POWER         |  1    |        256         |        0.065      |  LOWEST    |
 - TBT = To Be Added
 - Code Example:
   ```cpp
