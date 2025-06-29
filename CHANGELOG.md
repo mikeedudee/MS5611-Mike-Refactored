@@ -64,7 +64,7 @@ MS5611 Library Mike Refactored Version 1.0.4_exp_build_29072025 | 29 Jun 2025
 ### 🛠 FIXES
 - Corrected `read()` API behavior: `readPressure()` now returns the final computed value, not binary output.
 - Simplified resolution access:
-  - Changed from `MS5611_RESOLUTION::ULTRA_HIGH_RES` ➝ `ULTRA_HIGH_RES` (no need to prefix with `MS5611::`).
+  - Changed from `MS5611_RESOLUTION::ULTRA_HIGH_RES` ➝ `ULTRA_HIGH_RES` (no need to prefix with `MS5611::Oversampling`).
 - Resolved `const` member function issue where it could not access external members.
 - General bug fixes and stability improvements.
 
