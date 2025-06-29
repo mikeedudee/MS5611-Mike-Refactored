@@ -48,8 +48,12 @@ Major key optimizations and changes in the source code are listed in the [CHANGE
 
 ### Compatibility
 
-The library should be compatible with MS56XX, MS57xx and MS58xx devices (to be tested). 
+The library should be compatible with MS56XX, MS57xx, and MS58xx devices (to be tested). 
 Some device types will return only 50% of the pressure value. <- fixed with reset and pressure checking
+
+ - Tested Environment
+   - Teensy 4.1
+   - However, the library should be compatible with all micro-controllers. For assurance, check your microcontroller Wire compatibility limit. Please report if bugs or incompatibility occur, I'll try to resolve the issue ASAP.
 
 ### Oversampling
 
