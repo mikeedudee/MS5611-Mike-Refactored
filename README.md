@@ -136,6 +136,8 @@ void loop() {
 | `getSeaLevel()` | Computes sea level pressure in Pascal |
 | `getManufacturer()` | returns manufacturer private info | 
 | `getSerialCode()` | returns serialCode from the PROM\[7] minus the CRC |
+| `getOSRCode()` | Return the raw OSR command code (0x00,0x02,0x04,0x06,0x08) |
+| `getConvTimeMs()` | Return the conversion time (ms) for the current OSR |
 
 ## Contributing
 
