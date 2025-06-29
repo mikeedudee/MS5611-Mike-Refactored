@@ -53,7 +53,7 @@ Some device types will return only 50% of the pressure value. <- fixed with rese
 
 ### Oversampling
 
-- **void setOversampling(osr samplingRate)** sets the amount of oversampling. 
+- **void setOversampling(Oversampling osr)** sets the amount of oversampling. 
 See the table below and test the example of how to use.
 - **Oversampling getOversampling()** returns amount of oversampling.
 
