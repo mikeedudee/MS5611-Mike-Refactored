@@ -29,7 +29,7 @@ Refactored and Enhanced version of the MS5611 Pressure & Temperature Sensor Ardu
 //          PS  | o    O |   O = opening  PS = protocol select
 //              +--------+
 //
-//  PS to VCC  ==>  I2C  (GY-63 board has internal pull up, so not needed)
+//  PS to VCC  ==>  I2C  (GY-63 board has internal pull-up, so not needed)
 //  PS to GND  ==>  SPI
 //  CS to VCC  ==>  0x76
 //  CS to GND  ==>  0x77
@@ -49,33 +49,33 @@ Major key optimizations and changes in the source code are listed in the [CHANGE
 ### Compatibility
 
 The library should be compatible with MS56XX, MS57xx and MS58xx devices (to be tested). 
-Some device types will return only 50% of the pressure value. 
+Some device types will return only 50% of the pressure value. <- fixed with reset and pressure checking
 
 ### Oversampling
 
 - **void setOversampling(osr samplingRate)** sets the amount of oversampling. 
-See table below and test example how to use.
-- **osr_t getOversampling()** returns amount of oversampling.
+See the table below and test the example of how to use.
+- **Oversampling getOversampling()** returns amount of oversampling.
 
 
-Some numbers from datasheet, page 3 MAX column rounded up. (see #23)
+Some numbers from the datasheet, page 3, MAX column rounded up. (see #23)
 (actual read time differs - see performance sketch)
 
-|        definition       | value | oversampling ratio | resolution (mbar) | time (us) | notes  |
-|:-----------------------:|:-----:|:------------------:|:-----------------:|:---------:|:------:|
-| MS5611_ULTRA_HIGH_RES   |  10   |        TBT         |        TBT        |    TBT    |
-| MS5611_HIGH_RES         |  5    |        TBT         |        TBT        |    TBT    |
-| MS5611_STANDARD         |  3    |        TBT         |        TBT        |    TBT    |
-| MS5611_LOW_POWER        |  2    |        TBT         |        TBT        |    TBT    |
-| MS5611_ULTRA_LOW_POWER  |  1    |        TBT         |        TBT        |    TBT    | 
+|        definition       | value | oversampling ratio | resolution (mbar) | notes  |
+|:-----------------------:|:-----:|:------------------:|:-----------------:|:------:|
+| ULTRA_HIGH_RES          |  10   |        4096        |        0.012      |   
+| HIGH_RES                |  5    |        2048        |        0.018      |  Default 
+| STANDARD                |  3    |        1024        |        0.027      |  
+| LOW_POWER               |  2    |        512         |        0.042      |    
+| ULTRA_LOW_POWER         |  1    |        256         |        0.065      |  
 - TBT = To Be Added
 - Code Example:
   ```cpp
-  MS5611.setOversampling(MS5611::Oversampling::MS5611_HIGH_RES);
+  MS5611.setOversampling(HIGH_RES);
   // or
-  ms5611.begin(MS5611::Oversampling::MS5611_ULTRA_HIGH_RES))
+  ms5611.begin(ULTRA_HIGH_RES))
   ```
-`In future releases, you won't need to add the "MS5611::Oversampling::"`
+`Setting the Oversample resolution or using it during .begin is usually the same,  the difference is that the "setOversampling()" API function is dynamic—can be called anywhere setting the sensors adapt to various mission profiles or requirements.`
 
 ## Installation
 
@@ -108,7 +108,7 @@ void setup() {
     while (1);
   }
 
-  ms5611.setOversampling(MS5611::Oversampling::MS5611_HIGH_RES);
+  ms5611.setOversampling(MS5611::Oversampling::HIGH_RES);
 }
 
 void loop() {
@@ -138,6 +138,10 @@ void loop() {
 | `getSerialCode()` | returns serialCode from the PROM\[7] minus the CRC |
 | `getOSRCode()` | Return the raw OSR command code (0x00,0x02,0x04,0x06,0x08) |
 | `getConvTimeMs()` | Return the conversion time (ms) for the current OSR |
+| `getAddress()` | Return I2C Address |
+| `getDeviceID()` | Return device ID (XOR of PROM words) |
+| `getPROM()` | Read PROM coefficient at specified index (0-6)  |
+| `getCRC()` | Calculate CRC4 checksum for the PROM coefficients |
 
 ## Contributing
 
