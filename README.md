@@ -4,7 +4,8 @@
 [![GitHub issues](https://img.shields.io/github/issues/mikeedudee/MS5611-Mike-Refactored.svg)](https://github.com/mikeedudee/MS5611-Mike-Refactored/issues)
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/mikeedudee/MS5611-Mike-Refactored/blob/master/LICENSE)
-[![GitHub release](https://img.shields.io/github/release/mikeedudee/MS5611-Mike-Refactored.svg?maxAge=3600)](https://github.com/mikeedudee/MS5611-Mike-Refactored/releases)
+[![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/mikeedudee/MS5611-Mike-Refactored?label=latest)](https://github.com/mikeedudee/MS5611-Mike-Refactored/tags)
+
 
 
 
