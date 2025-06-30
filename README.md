@@ -136,6 +136,8 @@ void loop() {
 | `readPressure()` | Returns last measured pressure (Pa) |
 | `readRawPressure()` | Returns raw reading of the sensor pressure |
 | `readRawTemperature()` | Return raw reading of the sensor temperature |
+| `setPressureOffset()` | set a reading Offset (manual calibration) to the pressure  |
+| `setTemperatureOffset() ` | set a reading Offset (manual calibration) to the temperature  |
 | `setOversampling(mode)` | Sets oversampling (see table above) |
 | `getOversampling()` | Returns current oversampling setting |
 | `getAltitude()` | Returns computed altitude in meters |
