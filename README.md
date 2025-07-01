@@ -39,9 +39,9 @@ This library extends the original MS5611 driver by Korneliusz Jarzebski with str
 * **Dynamic filtering & smoothing** via median and Kalman filters
 * **True derivative estimation** for vertical velocity and acceleration using external timestamps
 * **Spike detection** to flag or suppress sudden outliers—flags and resets the sensor once detected and then counts it
-* **Performance mode** is useful for during memory constraints
+* **Performance mode** is useful for during memory constraints or bypass overheads
 * **Manual-mode read APIs** for last getPressure() and getTemperature() values [available only if performance mode is enabled]
-* **Reference-based altitude calculation** dynamically set for user specific reading-output
+* **Reference-based altitude calculation** dynamically set for user-specific reading-output
 
 Some features come from or are inspired by Rob Tillaart MS5611 library.
 
