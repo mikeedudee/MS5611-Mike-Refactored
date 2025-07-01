@@ -43,7 +43,7 @@ This library extends the original MS5611 driver by Korneliusz Jarzebski with str
 * **Manual-mode read APIs** for last getPressure() and getTemperature() values [available only if performance mode is enabled]
 * **Reference-based altitude calculation** dynamically set for user specific reading-output
 
-Some functions and features come from or are inspired by Rob Tillaart MS5611 library.
+Some features come from or are inspired by Rob Tillaart MS5611 library.
 
 Fully independent and maintained; please report any issues on the [issue tracker](https://github.com/mikeedudee/MS5611-Mike-Refactored/issues).
 
