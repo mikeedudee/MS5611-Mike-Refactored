@@ -227,10 +227,23 @@ class MS5611 {
         //   consecutiveCount:  spikes in a row before reset (default 1)
         void spikeDetection(bool enable = false,
                             uint8_t ringSize          = 5,
-                            float   threshold         = 100.0f,
+                            float   threshold         = 10.0f,
                             float   temperature       = NAN,
                             float   pressure          = NAN,
                             uint8_t consecutiveCount  = 5);
+
+        // call this whenever you detect a spike
+        void incrementSpikeCounter();
+
+        // get how many spikes have occurred so far
+        int  getSpikeCounter() const;
+
+        // reset count back to zero
+        void resetSpikeCounter();
+
+        // Returns how many times resetSensor() has been called
+        int  getResetCount() const { return _resetCount; }
+
 
     private:
         // I2C command and address constants
@@ -289,5 +302,8 @@ class MS5611 {
 
         // new members for N-in-a-row logic:
         uint8_t  _spikeConsecNeed  = 0;
-        uint8_t  _spikeConsecCount = 0;
+        int      _spikeCount       = 0;
+        
+        // counter for resets
+        int _resetCount = 0;
 };
