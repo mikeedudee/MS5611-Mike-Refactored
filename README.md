@@ -6,14 +6,9 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/mikeedudee/MS5611-Mike-Refactored/blob/master/LICENSE)
 [![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/mikeedudee/MS5611-Mike-Refactored?label=latest)](https://github.com/mikeedudee/MS5611-Mike-Refactored/tags)
 
-
-
-
 # MS5611 Mike Refactored
 
-Refactored and Enhanced version of the MS5611 Pressure & Temperature Sensor Arduino Library.
-
-### Breakout GY-63
+A refactored and enhanced Arduino library for the MS5611 pressure & temperature sensor, now featuring dynamic filtering, derivative estimation, spike detection, and performance benchmarking.
 
 ```cpp
 //
@@ -38,66 +33,33 @@ Refactored and Enhanced version of the MS5611 Pressure & Temperature Sensor Ardu
 ```
 
 ## Description
-This library exclusively supports the I2C interface. It is a refactored and enhanced version originally based on the library by Korneliusz Jarzebski. Structural improvements, optimizations, and additional features have been incorporated, including expanded API support. Several functions and design elements are adapted from or inspired by Rob Tillaart's MS5611 library, integrated with further modifications for improved performance and usability.
 
-The device default address is 0x76 or 0x77, depending on the CSB/CSO pin.
+This library extends the original MS5611 driver by Korneliusz Jarzebski with structural refactoring, optimizations, and a suite of new features:
 
+* **Dynamic filtering & smoothing** via median and Kalman filters
+* **True derivative estimation** for vertical velocity and acceleration using external timestamps
+* **Spike detection** to flag or suppress sudden outliers
+* **Performance benchmarking** with `performanceRead()` timing metrics
+* **Manual-mode read APIs** for last pressure and temperature values
+* **Reference-based altitude calculation** overload
 
-Please do note that this library is maintained and solely developed independently. Bugs or incompatibility may occur at your instance; if so, please report to me immediately.
+Fully independent and maintained; please report any issues on the [issue tracker](https://github.com/mikeedudee/MS5611-Mike-Refactored/issues).
 
-Major key optimizations and changes in the source code are listed in the [CHANGELOG.md](./CHANGELOG.md); future enhancements are still ongoing development.
+## Compatibility
 
-### Compatibility
-
-The library should be compatible with MS56XX, MS57xx, and MS58xx devices (to be tested). 
-Some device types will return only 50% of the pressure value. <- fixed with reset and pressure checking
-
- - Tested Environment
-   - Teensy 4.1
-   - However, the library should be compatible with all micro-controllers. For assurance, check your microcontroller Wire compatibility limit. Please report if bugs or incompatibility occur, I'll try to resolve the issue ASAP.
-
-### Oversampling
-
-- **void setOversampling(Oversampling osr)** sets the amount of oversampling. 
-See the table below and test the example of how to use.
-- **Oversampling getOversampling()** returns amount of oversampling.
-
-
-Some numbers from the datasheet, page 3, MAX column rounded up. (see #23)
-(actual read time differs - see performance sketch)
-
-There are 5 oversampling settings, each corresponding to a different number of milliseconds. The higher the oversampling, the more accurate the reading will be; however, the longer it will take. So it must take into account to suit your mission profile/needs.
-
-|        definition       | value | oversampling ratio | resolution (mbar) | Resolution | notes  |
-|:-----------------------:|:-----:|:------------------:|:-----------------:|:----------:|:-------:
-| ULTRA_HIGH_RES          |  10   |        4096        |        0.012      |  HIGHEST   |
-| HIGH_RES                |  5    |        2048        |        0.018      |  HIGH      | Default 
-| STANDARD                |  3    |        1024        |        0.027      |  MEDIUM    |
-| LOW_POWER               |  2    |        512         |        0.042      |   LOW      |
-| ULTRA_LOW_POWER         |  1    |        256         |        0.065      |  LOWEST    |
-- Code Example:
-  ```cpp
-  MS5611.setOversampling(HIGH_RES);
-  // or
-  ms5611.begin(ULTRA_HIGH_RES))
-  ```
-Setting the Oversample resolution or using it during .begin is usually the same,  the difference is that the "setOversampling()" API function is dynamic—can be called anywhere setting the sensors adapt to various mission profiles or requirements.
+* I2C interface only
+* Default addresses: `0x76` or `0x77` (CSB/CSO pin)
+* Tested on Teensy 4.1; should work with any Arduino-compatible board supporting `Wire`
+* Compatible with MS56xx, MS57xx, MS58xx (some require reset & pressure check fix)
 
 ## Installation
 
-You can install this library via the Arduino Library Manager by importing it manually:
+1. Clone or download this repository
+2. In Arduino IDE: **Sketch** → **Include Library** → **Add .ZIP Library…**
 
-1. Download this repository as a zip.
-2. In the Arduino IDE, (upper-left) click the "Sketch" drop-down button.
-3. Select "Include Library".
-4. Then, click "Add .ZIP Library..."
-   
----
+## Usage Examples
 
-### **Example Usage**
-Provide a working usage snippet and brief explanation:
-
-## Basic Example
+### Basic Example
 
 ```cpp
 #include <Wire.h>
@@ -108,55 +70,134 @@ MS5611 ms5611;
 void setup() {
   Serial.begin(115200);
   Wire.begin();
-  
+
   if (!ms5611.begin()) {
     Serial.println("MS5611 not found!");
     while (1);
   }
-
   ms5611.setOversampling(HIGH_RES);
 }
 
 void loop() {
   ms5611.readSensor();
-  Serial.print("Temperature (°C): ");
+  Serial.print("Temp (°C): ");
   Serial.println(ms5611.readTemperature());
-  Serial.print("Pressure (mbar): ");
+  Serial.print("Pres (Pa): ");
   Serial.println(ms5611.readPressure());
   delay(1000);
 }
 ```
 
+### Advanced Example (Filters, Dynamics & Spike Detection)
+
+```cpp
+#include <Wire.h>
+#include <MS5611.h>
+
+MS5611 ms5611;
+float refPressure;
+unsigned long lastTime;
+float lastVelocity;
+
+void setup() {
+  Serial.begin(115200);
+  Wire.begin();
+  ms5611.begin(ULTRA_HIGH_RES);
+
+  // reference for relative altitude
+  ms5611.readSensor();
+  refPressure = ms5611.readPressure();
+
+  // enable dynamic filters
+  ms5611.enableMedianFilter(11);
+  ms5611.enableKalmanFilter(0.5, 0.5, 0.138);
+
+  // enable spike detection
+  ms5611.spikeDetection(true);
+
+  lastTime = millis();
+}
+
+void loop() {
+  unsigned long now = millis();
+
+  // batch read + timing
+  auto perf = ms5611.performanceRead();
+  Serial.print("Read time (ms): ");
+  Serial.println(perf.elapsedMs);
+
+  float alt = ms5611.getAltitude(perf.pressure, refPressure);
+  float vel = ms5611.getVelocity(alt, now);
+  float acc = ms5611.getAcceleration(vel, now);
+
+  Serial.print("Alt (m): "); Serial.println(alt);
+  Serial.print("Vel (m/s): "); Serial.println(vel);
+  Serial.print("Acc (m/s²): "); Serial.println(acc);
+
+  lastVelocity = vel;
+  lastTime = now;
+  delay(500);
+}
+```
+
 ## API Reference
 
-| Function | Description |
-|---------|-------------|
-| `begin()` | Initializes the sensor |
-| `readTemperature()` | Returns last measured temperature (°C) |
-| `readPressure()` | Returns last measured pressure (Pa) |
-| `readRawPressure()` | Returns raw reading of the sensor pressure |
-| `readRawTemperature()` | Return raw reading of the sensor temperature |
-| `setPressureOffset()` | set a reading Offset (manual calibration) to the pressure  |
-| `setTemperatureOffset() ` | set a reading Offset (manual calibration) to the temperature  |
-| `setOversampling(mode)` | Sets oversampling (see table above) |
-| `getOversampling()` | Returns current oversampling setting |
-| `getAltitude()` | Returns computed altitude in meters |
-| `getSeaLevel()` | Computes sea level pressure in Pascal |
-| `getManufacturer()` | returns manufacturer private info | 
-| `getSerialCode()` | returns serialCode from the PROM\[7] minus the CRC |
-| `getOSRCode()` | Return the raw OSR command code (0x00,0x02,0x04,0x06,0x08) |
-| `getConvTimeMs()` | Return the conversion time (ms) for the current OSR |
-| `getAddress()` | Return I2C Address |
-| `getDeviceID()` | Return device ID (XOR of PROM words) |
-| `getPROM()` | Read PROM coefficient at specified index (0-6)  |
-| `getCRC()` | Calculate CRC4 checksum for the PROM coefficients |
+### Initialization & Configuration
 
-## NOTE
-**ALWAYS REFER TO THE SENSOR'S DATASHEET**
+| Function                                  | Description                                          | Sample Usage
+| ----------------------------------------- | ---------------------------------------------------- |------------
+| `bool begin(Oversampling osr = HIGH_RES)` | Initialize sensor with optional oversampling setting |ms5611.begin()
+| `void setOversampling(Oversampling osr)`  | Change oversampling on the fly                       |
+| `Oversampling getOversampling()`          | Current oversampling setting                         |
+| `void setPressureOffset(float offset)`    | Apply manual pressure calibration offset             |
+| `void setTemperatureOffset(float offset)` | Apply manual temperature calibration offset          |
+
+### Standard Reads
+
+| Function                        | Description                             |
+| ------------------------------- | --------------------------------------- |
+| `readSensor()`             | Trigger a new temperature+pressure read |
+| `readTemperature()`      | Last measured temperature (°C)          |
+| `readPressure()`         | Last measured pressure (Pa)             |
+| `readRawTemperature()` | Raw temperature ADC value               |
+| `readRawPressure()`    | Raw pressure ADC value                  |
+
+### Filters & Dynamics
+
+| Function                                                        | Description                               | Sample Usage
+| --------------------------------------------------------------- | ----------------------------------------- |-----------------
+| `enableMedianFilter(uint32_t windowSize)`                  | Enable median smoothing                   |
+| `medianFilter(double input)`                             | Apply median filter once                  |
+| `enableKalmanFilter(double e_mea, double e_est, double q)` | Enable Kalman filter                      |
+| `kalmanFilter(double input)`                             | Apply Kalman filter once                  |
+| `resetDynamics()`                                          | Clear internal filter & derivative states |
+
+### Derivative Estimation
+
+| Function                                                          | Description                  |
+| ----------------------------------------------------------------- | ---------------------------- |
+| `getVelocity(double altitude, unsigned long timestamp)`     | Vertical velocity (m/s)      |
+| `getAcceleration(double velocity, unsigned long timestamp)` | Vertical acceleration (m/s²) |
+
+### Spike Detection & Utilities
+
+| Function                                                  | Description                                                             |
+| --------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `spikeDetection(bool enable)`                        | Toggle outlier detection/suppression. Automatically resets the MS5611 sensor once detected (1 second delay).                                    |
+| `performanceRead()`                                  | Batch read with timing metrics (`elapsedMs`, `pressure`, `temperature`) |
+| `getPressure()`                                     | Last raw pressure reading                                               |
+| `getTemperature()`                                  | Last raw temperature reading                                            |
+| `getAltitude(int32_t pressure, float refPressure)` | Altitude relative to reference (m)                                      |
+| `getSeaLevel()`                                    | Compute sea-level pressure (Pa)                                         |
+
+## Note
+
+Always refer to the [MS5611 datasheet](https://cdn-shop.adafruit.com/datasheets/MS5611.pdf) for timing, calibration, and electrical specifications.
 
 ## Contributing
 
-Contributions, issues, and feature requests are welcome.  
-Feel free to check the [issues page](https://github.com/mikeedudee/MS5611-Mike-Refactored/issues).
+Contributions, issues, and feature requests are welcome — please open an issue or submit a pull request on GitHub.
 
-This library is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
+---
+
+**License**: MIT (see [LICENSE](./LICENSE))
