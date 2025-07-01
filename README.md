@@ -106,26 +106,23 @@ Example:
 | ----------------------------------------- | ---------------------------------------------------- |------------
 | `begin(Oversampling osr = HIGH_RES)`      | Initialize sensor with optional oversampling setting | `ms5611.begin(resolution);` or `ms5611.begin();`
 | `setOversampling(Oversampling osr)`       | Change oversampling on the fly                       | `ms5611.setOversampling(resolution);` <-- dynamic resolution changer
-| `Oversampling getOversampling()`          | Returns current applied oversampling setting         | `Serial.println(ms5611.getOversampling());`
+| `getOversampling()`                       | Returns current applied oversampling setting         | `Serial.println(ms5611.getOversampling());`
 | `setPressureOffset(float offset)`         | Apply manual pressure calibration offset             | `ms5611.setPressureOffset(10000);` <-- Must be in unit of Pascal
 | `setTemperatureOffset(float offset)`      | Apply manual temperature calibration offset          | `ms5611.setPressureOffset(15);` <-- Must be in degree of Celsius
 | `resetSensor()`                           | This command clears the sensor's internal state and prepares it for a fresh start | `ms5611.resetSensor();`
 | `resetDynamics()`                         | Clear internal filter & derivative states. (Optional) reset the velocity and acceleration computation if you reconfigure filters mid-flight | `ms5611.resetDynamics();`
 
 ### Standard Reads
-*Accurate since each API function initiates its own raw conversion (either D1 for pressure or D2 for temperature), waits for the required conversion time, reads the ADC result, and performs the necessary compensation calculations—including second-order correction, which is enabled by default. This approach ensures high accuracy but comes at the cost of increased latency and memory cost, and processing overhead.*
-  - `readTemperature()`
-  - `readPressure()`
+The most accurate and best choice since each API function initiates its own raw conversion (either D1 for pressure or D2 for temperature), waits for the required conversion time, reads the ADC result, and performs the necessary compensation calculations—including second-order correction, which is enabled by default. This approach ensures high accuracy but comes at the cost of increased latency and memory cost, and processing overhead. If you don’t mind the slight extra latency and I²C overhead of separate calls, then readPressure()/readTemperature() alone are sufficient.
     
 | Function                        | Description                             | Sample Usage
 | ------------------------------- | --------------------------------------- | --------------------
 | `readTemperature(bool comp)`    | get the Temperature reading             |  `Serial.println(ms5611.readTemperature());`
 | `readPressure(bool comp)`       | provide the pressure reading            |  `Serial.println(ms5611.readPressure());`
-| `readRawTemperature()`          | Raw temperature ADC value               |  `Serial.println(ms5611.readRawTemperature());`
-| `readRawPressure()`             | Raw pressure ADC value                  |  `Serial.println(ms5611.readRawPressure());`
 
 ### Performance Mode
-*In cases you have memory constraints or you prioritize minimum latency as much as possible and simultaneous reading of both temperature and pressure, the performance API's are best suited to your mission profile. However, it is not as accurate than the standard read mode*.
+In cases you have memory constraints or you prioritize minimum latency as much as possible and simultaneous reading of both temperature and pressure, the performance API's are best suited to your mission profile. However, it is not as accurate as the standard read mode. How? It only does one pair of conversions instead of kicking off two separate conversions if you were to call getTemperature(), then getPressure(). Both values come from the same “moment” in time, since D1 and D2 were measured back-to-back, which is important in high-dynamics (e.g. fast maneuvers) and you can call getPressure() and getTemperature() as often as you like, without extra I²C or math, until your next read due to cached results.
+
 | Function                        | Description                             | Sample Usage          |
 | ------------------------------- | --------------------------------------- | ----------------
 | `performanceRead(bool value)`   | API call to trigger (on/off) the second-order compensation computation (default: on) | `auto ms5611.performanceRead(true/false);`
@@ -143,7 +140,7 @@ Example:
 *Either way works, use that suits your workflow.*
 
 ### Filters
-*This library provides two built-in filtering methods, each with its own distinct characteristics and advantages. I encourage you to experiment and evaluate both to determine which is best suited for their specific mission profile or application requirements.*
+This library provides two built-in filtering methods, each with its own distinct characteristics and advantages. I encourage you to experiment and evaluate both to determine which is best suited for their specific mission profile or application requirements.
 
 - **Median Filter** - a non-linear digital filtering technique often used to remove spikes or "salt-and-pepper" noise from a signal while preserving sharp transitions.
 - **Kalman Filter** - a recursive, optimal estimator for linear dynamical systems subject to Gaussian noise. It blends a predictive model ("what you expect") with noisy measurements ("what you observe") to produce a statistically optimal estimate of the system’s state.
@@ -156,16 +153,17 @@ Example:
 | `kalmanFilter(double input)`                                    | Apply Kalman filter                       | `float Altitude = ms5611.getAltitude(Pressure); ms5611.kalmanFilter(Altitude);`
 
 
-- **Median Filter** - The single parameter to `enableMedianFilter(ws)` is the *window size* `ws`, which controls how many of the most-recent altitude samples are considered when computing the median. Recommended starting point for barometric altitude at ~10 Hz sample rate, ws = 5 or 7 often works well—enough to suppress occasional spikes without too much lag. The default value for the filter is 5. **Value must be odd and max=21 & min=3**
+- **Median Filter** - The single parameter to `enableMedianFilter(ws)` is the *window size* `ws`, which controls how many of the most recent altitude samples are considered when computing the median. Recommended starting point for barometric altitude at ~10 Hz sample rate, ws = 5 or 7 often works well—enough to suppress occasional spikes without too much lag. The default value for the filter is 5. **Value must be odd and max=21 & min=3**
   - default value: `enableMedianFilter(5u);`
 - **Kalman Filter**
-  - `e_mea = measurement uncertainty` - *Represents how noisy you believe each new barometric altitude reading is. A larger e_mea means “I don’t trust the sensor much,” so the filter leans more on its own prediction and smooths out spikes.*]
+  - `e_mea = measurement uncertainty` - *Represents how noisy you believe each new barometric altitude reading is. A larger e_mea means “I don’t trust the sensor much,” so the filter leans more on its prediction and smooths out spikes.*]
   - `e_est = Initial estimate uncertainty` - *The filter’s initial covariance on its own state estimate before seeing any measurements. A larger e_est says “I’m very uncertain about my starting altitude estimate,” so the first few measurements will shift the estimate more aggressively.*
-  - `q = Process noise` - *Models how much the true altitude is expected to change unpredictably between samples (e.g.\ turbulence, rapid ascent/descent). A larger q makes the filter adapt more quickly to real changes but also lets more measurement noise through.*
+  - `q = Process noise` - *Models how much the true altitude is expected to change unpredictably between samples (e.g.\ turbulence, rapid ascent/descent). A larger q makes the filter adapt more quickly to real changes, but also lets more measurement noise through.*
   - default value: `enableKalmanFilter(float e_mea = 1.0f, float e_est = 1.0f, float q = 0.01f);`
 
 
 ### Derivative Estimation
+Using the `getVelocity()` and `getAcceleration()` API functions.
 
 | Function                                                          | Description                  |
 | ----------------------------------------------------------------- | ---------------------------- |
@@ -201,20 +199,59 @@ Example:
 
 ### Spike Detection & Utilities
 
-| Function                                                  | Description                                                             |
-| --------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `spikeDetection(bool enable)`                        | Toggle outlier detection/suppression. Automatically resets the MS5611 sensor once detected (1 second delay).                                    |
-|                                      | Last raw pressure reading                                               |
-|                                   | Last raw temperature reading                                            |
-| `getAltitude(int32_t pressure, float refPressure)` | Altitude relative to reference (m)                                      |
-| `getSeaLevel()`                                    | Compute sea-level pressure (Pa)                                         |
+| Function                                           | Description                                                             | Sample Usage
+| -------------------------------------------------- | ----------------------------------------------------------------------- | ------------
+| `spikeDetection(bool enable, uint8_t ringSize, float threshold, temperature, pressure, uint8_t consecutiveCount);`                      | Toggle outlier detection/suppression. Automatically resets the MS5611 sensor once anomally is detected (1 second delay) before resets.                                    |
+| `readRawTemperature()`          | Raw temperature ADC value               |  `Serial.println(ms5611.readRawTemperature());`
+| `readRawPressure()`             | Raw pressure ADC value                  |  `Serial.println(ms5611.readRawPressure());`
+| `getAltitude(int32_t pressure, float refPressure)` | Altitude relative to reference (m)                                      | `ms5611.getAltitude(Pressure);`
+| `getSeaLevel(double p, double alt)`                | Compute sea-level pressure (Pa)                                         | `ms5611.getSeaLevel(Pressure, Current_Altitude);`
 
-### Debuggin (Dev-mode)
-| Function                                                  | Description                                                             |
-| --------------------------------------------------------- | ----------------------------------------------------------------------- |
+- *How to use the `spikeDetection()` API:
+  - The function requires six positional arguments, all of which must be explicitly defined for proper operation. These parameters are user-defined and should be configured to suit your mission requirements or system standards.
+  - it can be called once or only 1 positional argument, e.g.: `spikeDetection(true);` this works and will load the default values for the other positional arguments
+    - default values:
+      - `Window = 5`
+      - `Threshold` = 10` - the jump in 10kPa
+      - `temperature = NAN` - reads the standard reading of temperature unless satisfied.
+      - `pressure = NAN` - reads the standard reading of pressure unless satisfied.
+      - `consecutiveCount = 5` - spikes in a row before reset (going lower will make it react immediately since it only needs 1 data)
+
+**Sample  Usage**
+  ```cpp
+  ms5611.spikeDetection(true, 5, 10, temperature, pressure, 3);
+  ```
+  - Once there is a spike for about >= 10kPa in the pressure or in the order of temperature for three cycles, it will trigger the spike guard and reset the sensor.
+
+### Debugging (Dev-mode)
+| Function                      | Description                                                             |
+| ------------------------------| ----------------------------------------------------------------------- |
+| `MS5611_AUTHOR`               | returns the author of the library                                       |
+| `MS5611_LIBRARY_NAME`         | returns the library name
+| `MS5611_LIB_VERSION`          | returns the library build version
+| `MS5611_LIBRARY_LICENSE`      | returns the library license
+| `MS5611_LIBRARY_DESCRIPTION`  | returns library description
+| `MS5611_LIBRARY_URL`          | returns the library's GitHub repository
+| `MS5611_ENVIRONMENT_COMPT`    | returns the library's tested environment
+| `getManufacturer()`           | returns manufacturer private info | 
+| `getSerialCode()`             | returns serialCode from the PROM\[7] minus the CRC |
+| `getOSRCode()`                | return the raw OSR command code (0x00,0x02,0x04,0x06,0x08) |
+| `getConvTimeMs()`             | return the conversion time (ms) for the current OSR |
+| `getAddress()`                | return I2C Address |
+| `getDeviceID()`               | return device ID (XOR of PROM words) |
+| `getPROM()`                   | read PROM coefficient at specified index (0-6)  |
+| `getCRC()`                    | calculate CRC4 checksum for the PROM coefficients |
+| `getLastRead()`               | timestamp of the last read operation
+| `getResult()`                 | get result of the last operation (0 = success, non-zero = error)
+| `getSpikeCounter()`           | return the counting of spike/anomaly reading position 
+| `getResetCount()`             | return how many times a reset occurred (dev-mode)
+
+
 ## Note
 
 Always refer to the [MS5611 datasheet](https://cdn-shop.adafruit.com/datasheets/MS5611.pdf) for timing, calibration, and electrical specifications.
+
+Major key optimizations and changes in the source code are listed in the [CHANGELOG.md](./CHANGELOG.md); future enhancements are still ongoing development.
 
 ## Usage Examples
 
