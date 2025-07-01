@@ -156,7 +156,7 @@ This library provides two built-in filtering methods, each with its own distinct
 - **Median Filter** - The single parameter to `enableMedianFilter(ws)` is the *window size* `ws`, which controls how many of the most recent altitude samples are considered when computing the median. Recommended starting point for barometric altitude at ~10 Hz sample rate, ws = 5 or 7 often works well—enough to suppress occasional spikes without too much lag. The default value for the filter is 5. **Value must be odd and max=21 & min=3**
   - default value: `enableMedianFilter(5u);`
 - **Kalman Filter**
-  - `e_mea = measurement uncertainty` - *Represents how noisy you believe each new barometric altitude reading is. A larger e_mea means “I don’t trust the sensor much,” so the filter leans more on its prediction and smooths out spikes.*]
+  - `e_mea = measurement uncertainty` - *Represents how noisy you believe each new barometric altitude reading is. A larger e_mea means “I don’t trust the sensor much,” so the filter leans more on its prediction and smooths out spikes.*
   - `e_est = Initial estimate uncertainty` - *The filter’s initial covariance on its own state estimate before seeing any measurements. A larger e_est says “I’m very uncertain about my starting altitude estimate,” so the first few measurements will shift the estimate more aggressively.*
   - `q = Process noise` - *Models how much the true altitude is expected to change unpredictably between samples (e.g.\ turbulence, rapid ascent/descent). A larger q makes the filter adapt more quickly to real changes, but also lets more measurement noise through.*
   - default value: `enableKalmanFilter(float e_mea = 1.0f, float e_est = 1.0f, float q = 0.01f);`
