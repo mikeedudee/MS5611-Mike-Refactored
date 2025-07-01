@@ -130,7 +130,7 @@ uint32_t MS5611::readRegister24(uint8_t reg) const {
     // Check if the transmission was successful
     // If not, return UINT32_MAX to indicate an error
     if (wire_->endTransmission() != 0) {
-    return UINT32_MAX;
+        return UINT32_MAX;
     }
 
     // Request 3 bytes from the sensor
@@ -285,8 +285,9 @@ float MS5611::readPressure(bool comp) const {
         SENS -= sens2;
     }
 
-    int32_t P = int32_t(((D1 * SENS >> 21) - OFF) >> 15);
-    float pressure_final = P  + float(pressureOffset_);
+    int32_t P               = int32_t(((D1 * SENS >> 21) - OFF) >> 15);
+    float   pressure_final  = P  + float(pressureOffset_);
+
     return pressure_final;
 }
 
@@ -380,10 +381,11 @@ void MS5611::spikeDetection(bool enable,
                             float   pressure,
                             uint8_t consecutiveCount)
 {
-    // 1) On real enable-transition or window-size change: seed buffers & reset counters
+    // On real enable-transition or window-size change: seed buffers & reset counters
     if ( enable && (! _spikeWasEnabled || ringSize != _spikeRingSize) ) {
         // clamp window
         _spikeRingSize  = constrain(ringSize, 1, SPIKE_MAX_RING);
+
         // update threshold & count
         if (threshold > 0.0f)          _spikeThreshold   = threshold * 10.0f;
         _spikeConsecNeed = max<uint8_t>(1, consecutiveCount);
@@ -403,32 +405,34 @@ void MS5611::spikeDetection(bool enable,
 
     _spikeWasEnabled = enable;    // remember for next call
 
-    // 2) If disabled, bail out
+    // If disabled, bail out
     if (!enable) return;
 
-    // 3) Read or use overrides
+    // Read or use overrides
     float p = isnan(pressure)    ? readPressure()    : pressure;
     float t = isnan(temperature) ? readTemperature() : temperature;
 
-    // 4) Update buffer & compute rolling mean
+    // Update buffer & compute rolling mean
     _spikeBufP[_spikeIdx] = p;
     _spikeBufT[_spikeIdx] = t;
-    _spikeIdx = (_spikeIdx + 1) % _spikeRingSize;
+    _spikeIdx             = (_spikeIdx + 1) % _spikeRingSize;
 
     float sumP = 0, sumT = 0;
+
     for (uint8_t i = 0; i < _spikeRingSize; ++i) {
         sumP += _spikeBufP[i];
         sumT += _spikeBufT[i];
     }
+
     float avgP = sumP / _spikeRingSize;
     float avgT = sumT / _spikeRingSize;
 
-    // 5) Detect & count consecutive spikes
-    bool isSpike = (fabs(p - avgP) > _spikeThreshold)
-                || (fabs(t - avgT) > _spikeThreshold);
+    // Detect & count consecutive spikes
+    bool isSpike = (fabs(p - avgP) > _spikeThreshold) || (fabs(t - avgT) > _spikeThreshold);
 
     if (isSpike) {
         incrementSpikeCounter();
+
         if (getSpikeCounter() >= _spikeConsecNeed) {
             Serial.println(F("MS5611 Spike Detected!"));
             Serial.println("Resetting sensor...");
@@ -498,8 +502,8 @@ uint16_t MS5611::readProm(uint8_t reg) {
 uint32_t MS5611::readADC() {
   command(MS5611_READ_ADC);
   if (_result == 0) {
-    uint8_t length = 3;
-    int bytes = wire_->requestFrom(address_, length);
+    uint8_t length  = 3;
+    int     bytes   = wire_->requestFrom(address_, length);
 
     if (bytes >= length) {
       uint32_t  value = wire_->read() * 65536UL;

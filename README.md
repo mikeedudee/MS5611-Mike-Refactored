@@ -38,10 +38,10 @@ This library extends the original MS5611 driver by Korneliusz Jarzebski with str
 
 * **Dynamic filtering & smoothing** via median and Kalman filters
 * **True derivative estimation** for vertical velocity and acceleration using external timestamps
-* **Spike detection** to flag or suppress sudden outliers
-* **Performance benchmarking** with `performanceRead()` timing metrics
-* **Manual-mode read APIs** for last pressure and temperature values
-* **Reference-based altitude calculation** overload
+* **Spike detection** to flag or suppress sudden outliers—flags and resets the sensor once detected and then counts it
+* **Performance mode** is useful for during memory constraints
+* **Manual-mode read APIs** for last getPressure() and getTemperature() values [available only if performance mode is enabled]
+* **Reference-based altitude calculation** dynamically set for user specific reading-output
 
 Fully independent and maintained; please report any issues on the [issue tracker](https://github.com/mikeedudee/MS5611-Mike-Refactored/issues).
 
@@ -68,7 +68,7 @@ Fully independent and maintained; please report any issues on the [issue tracker
 MS5611 ms5611;
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(9600);
   Wire.begin();
 
   if (!ms5611.begin()) {
@@ -79,7 +79,6 @@ void setup() {
 }
 
 void loop() {
-  ms5611.readSensor();
   Serial.print("Temp (°C): ");
   Serial.println(ms5611.readTemperature());
   Serial.print("Pres (Pa): ");
@@ -100,37 +99,34 @@ unsigned long lastTime;
 float lastVelocity;
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(9600);
   Wire.begin();
   ms5611.begin(ULTRA_HIGH_RES);
 
   // reference for relative altitude
-  ms5611.readSensor();
-  refPressure = ms5611.readPressure();
+  refPressure = ms5611.getPressure();
 
   // enable dynamic filters
-  ms5611.enableMedianFilter(11);
-  ms5611.enableKalmanFilter(0.5, 0.5, 0.138);
-
-  // enable spike detection
-  ms5611.spikeDetection(true);
+  ms5611.enableMedianFilter(11); // Format: (window size) (value must be odd and max=21, min=3, default=5)
 
   lastTime = millis();
 }
 
 void loop() {
+  // enable spike detection
+  ms5611.spikeDetection(true, 5, 10); // Format: (state, window, threshold) 
+
   unsigned long now = millis();
 
   // batch read + timing
-  auto perf = ms5611.performanceRead();
   Serial.print("Read time (ms): ");
-  Serial.println(perf.elapsedMs);
 
-  float alt = ms5611.getAltitude(perf.pressure, refPressure);
-  float vel = ms5611.getVelocity(alt, now);
+  float alt = ms5611.getAltitude(ms5611.getPressure(), refPressure);
+  float altFilt = ms5611.medianFilter(alt);
+  float vel = ms5611.getVelocity(altFilt, now);
   float acc = ms5611.getAcceleration(vel, now);
 
-  Serial.print("Alt (m): "); Serial.println(alt);
+  Serial.print("Alt (m): "); Serial.println(altFilt);
   Serial.print("Vel (m/s): "); Serial.println(vel);
   Serial.print("Acc (m/s²): "); Serial.println(acc);
 
@@ -146,11 +142,11 @@ void loop() {
 
 | Function                                  | Description                                          | Sample Usage
 | ----------------------------------------- | ---------------------------------------------------- |------------
-| `bool begin(Oversampling osr = HIGH_RES)` | Initialize sensor with optional oversampling setting |ms5611.begin()
-| `void setOversampling(Oversampling osr)`  | Change oversampling on the fly                       |
+| `begin(Oversampling osr = HIGH_RES)` | Initialize sensor with optional oversampling setting |ms5611.begin()
+| `setOversampling(Oversampling osr)`  | Change oversampling on the fly                       |
 | `Oversampling getOversampling()`          | Current oversampling setting                         |
-| `void setPressureOffset(float offset)`    | Apply manual pressure calibration offset             |
-| `void setTemperatureOffset(float offset)` | Apply manual temperature calibration offset          |
+| `setPressureOffset(float offset)`    | Apply manual pressure calibration offset             |
+| `setTemperatureOffset(float offset)` | Apply manual temperature calibration offset          |
 
 ### Standard Reads
 
