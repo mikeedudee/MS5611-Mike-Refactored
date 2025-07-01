@@ -207,7 +207,7 @@ Using the `getVelocity()` and `getAcceleration()` API functions.
 | `getAltitude(int32_t pressure, float refPressure)` | Altitude relative to reference (m)                                      | `ms5611.getAltitude(Pressure);`
 | `getSeaLevel(double p, double alt)`                | Compute sea-level pressure (Pa)                                         | `ms5611.getSeaLevel(Pressure, Current_Altitude);`
 
-- *How to use the `spikeDetection()` API:
+- *How to use the `spikeDetection()` API:*
   - The function requires six positional arguments, all of which must be explicitly defined for proper operation. These parameters are user-defined and should be configured to suit your mission requirements or system standards.
   - it can be called once or only 1 positional argument, e.g.: `spikeDetection(true);` this works and will load the default values for the other positional arguments
     - default values:
