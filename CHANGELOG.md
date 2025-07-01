@@ -104,6 +104,12 @@ MS5611 Library Mike Refactored Version 1.0.8_exp_build_01082025 | 01 Jul 2025
     - `void resetDynamics();`  
     - `double medianFilter(double input);`  
     - `double kalmanFilter(double input);`  
+- **General Addition**
+  - Author description: `AUTHOR`
+  - Library URL: `LIBRARY_URL`
+  - Library Name: `LIBRARY_NAME`
+  - Library description: `LIBRARY_DESCRIPTION`
+  - Library Version: `MS5611_LIB_VERSION`
 
 - **Derivative estimation**  
   - `float getVelocity(double altitude, unsigned long timestamp);`  
