@@ -110,6 +110,9 @@ MS5611 Library Mike Refactored Version 1.0.8_exp_build_01082025 | 01 Jul 2025
   - Library Name: `LIBRARY_NAME`
   - Library description: `LIBRARY_DESCRIPTION`
   - Library Version: `MS5611_LIB_VERSION`
+  - Library License: `MS5611_LIBRARY_LICENSE`
+  - `getLastRead()` - Get timestamp of the last read operation
+  - `getResult()` - Get result of the last operation (0 = success, non-zero = error)
 
 - **Derivative estimation**  
   - `float getVelocity(double altitude, unsigned long timestamp);`  
@@ -141,4 +144,4 @@ MS5611 Library Mike Refactored Version 1.0.8_exp_build_01082025 | 01 Jul 2025
 ### Optimized
 - **Noise reduction** via median and Kalman filtering for more stable altitude outputs  
 - **Derivative estimator** now uses external time input for accurate velocity/acceleration  
-- **performanceRead()** added for throughput benchmarking of sensor reads  
+- **performanceRead()** added for throughput benchmarking of sensor reads  or for fast pace analysis.
