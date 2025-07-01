@@ -221,7 +221,7 @@ Using the `getVelocity()` and `getAcceleration()` API functions.
   ```cpp
   ms5611.spikeDetection(true, 5, 10, temperature, pressure, 3);
   ```
-  - Once there is a spike for about >= 10kPa in the pressure or in the order of temperature for three cycles, it will trigger the spike guard and reset the sensor.
+  - Once there is a spike for about >=< 10kPa in the pressure or in the order of temperature for three cycles, it will trigger the spike guard and reset the sensor.
 
 ### Debugging (Dev-mode)
 | Function                      | Description                                                             |
