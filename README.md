@@ -136,6 +136,33 @@ void loop() {
 }
 ```
 
+### Oversampling
+
+- **void setOversampling(Oversampling osr)** sets the amount of oversampling. 
+See the table below and test the example of how to use.
+- **Oversampling getOversampling()** returns amount of oversampling.
+
+
+Some numbers from the datasheet, page 3, MAX column rounded up. (see #23)
+(actual read time differs - see performance sketch)
+
+There are 5 oversampling settings, each corresponding to a different number of milliseconds. The higher the oversampling, the more accurate the reading will be; however, the longer it will take. So it must take into account to suit your mission profile/needs.
+
+|        definition       | value | oversampling ratio | resolution (mbar) | Resolution | notes  |
+|:-----------------------:|:-----:|:------------------:|:-----------------:|:----------:|:-------:
+| ULTRA_HIGH_RES          |  10   |        4096        |        0.012      |  HIGHEST   |
+| HIGH_RES                |  5    |        2048        |        0.018      |  HIGH      | Default 
+| STANDARD                |  3    |        1024        |        0.027      |  MEDIUM    |
+| LOW_POWER               |  2    |        512         |        0.042      |   LOW      |
+| ULTRA_LOW_POWER         |  1    |        256         |        0.065      |  LOWEST    |
+- Code Example:
+  ```cpp
+  MS5611.setOversampling(HIGH_RES);
+  // or
+  ms5611.begin(ULTRA_HIGH_RES))
+  ```
+Setting the Oversample resolution or using it during .begin is usually the same,  the difference is that the "setOversampling()" API function is dynamic—can be called anywhere setting the sensors adapt to various mission profiles or requirements.
+
 ## API Reference
 
 ### Initialization & Configuration
