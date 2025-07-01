@@ -92,3 +92,53 @@ MS5611 Library Mike Refactored Version 1.0.4_exp_build_29072025 | 29 Jun 2025
 
 - **Header Change (`MS5611.h`)**:
   - Oversampling enumeration moved *outside* the main class to enable global access without needing a class prefix.
+
+MS5611 Library Mike Refactored Version 1.0.8_exp_build_01082025 | 01 Jul 2025
+======================================================================
+### Added
+- **Filtering & dynamics modules**  
+  - `derivative_estimator.h`, `filters/median_filter.h`, `filters/kalman_filter.h`  
+  - **New MS5611 APIs:**  
+    - `void enableMedianFilter(uint32_t windowSize);`  
+    - `void enableKalmanFilter(double e_mea, double e_est, double q);`  
+    - `void resetDynamics();`  
+    - `double medianFilter(double input);`  
+    - `double kalmanFilter(double input);`  
+- **General Addition**
+  - Author description: `AUTHOR`
+  - Library URL: `LIBRARY_URL`
+  - Library Name: `LIBRARY_NAME`
+  - Library description: `LIBRARY_DESCRIPTION`
+  - Library Version: `MS5611_LIB_VERSION`
+
+- **Derivative estimation**  
+  - `float getVelocity(double altitude, unsigned long timestamp);`  
+  - `float getAcceleration(double velocity, unsigned long timestamp);`
+
+- **Alternate read modes**  
+  - `auto performanceRead();`       – returns timing metrics & raw data  
+  - `float getPressure();`          – manual last raw pressure reading  
+  - `float getTemperature();`       – manual last raw temperature reading
+
+- **Spike detection toggle**  
+  - `void spikeDetection(bool enable);` – enable or disable outlier suppression
+
+- **Altitude reference overload**  
+  - `double getAltitude(int32_t pressure, float referencePressure);`
+
+### Changed
+- **Version bump** in `library.json` and `library.properties` to 1.0.8  
+- **Example sketch** (`MS5611_processing.ino`):  
+  - Added `referencePressure` initialization and use  
+  - Integrated external timestamp (`millis()/1000`) for derivative calls  
+  - Invocations of all new filter, dynamics and spike-detection APIs  
+
+### Fixed
+- Corrected **error‐handling** logic to properly detect `NAN` and `INT32_MIN` readings  
+- Resolved **spike‐detection** threshold misbehavior in example sketch
+- General Bug Fixes
+
+### Optimized
+- **Noise reduction** via median and Kalman filtering for more stable altitude outputs  
+- **Derivative estimator** now uses external time input for accurate velocity/acceleration  
+- **performanceRead()** added for throughput benchmarking of sensor reads  
