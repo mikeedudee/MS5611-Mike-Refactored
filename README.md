@@ -253,6 +253,8 @@ Always refer to the [MS5611 datasheet](https://cdn-shop.adafruit.com/datasheets/
 
 Major key optimizations and changes in the source code are listed in the [CHANGELOG.md](./CHANGELOG.md); future enhancements are still ongoing development.
 
+*The features and the algorithm written for this library are all based on or are inspired by other libraries and on the MS5611 DATA SHEET*
+
 ## Usage Examples
 
 ### Basic Example
