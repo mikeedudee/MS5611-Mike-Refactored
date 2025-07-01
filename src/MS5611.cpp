@@ -165,6 +165,10 @@ void MS5611::resetSensor() {
     wire_->beginTransmission(address_);
     wire_->write(MS5611_RESET);
     wire_->endTransmission();
+
+    // Increment the reset count to keep track of how many times the sensor has been reset
+    // This can be useful for debugging or monitoring the sensor's state
+    ++_resetCount;
     delay(3);
 }
 
@@ -326,7 +330,7 @@ MS5611::Measure MS5611::performanceRead(bool comp)
   // calculate “raw” temperature (in 0.01°C)
   int32_t  TEMP = 2000 + (int64_t(dT) * cal_[5] >> 23);
 
-  // 4) optional 2nd-order compensation below 20°C
+  // optional 2nd-order compensation below 20°C
   if (comp && TEMP < 2000) {
     int64_t d2    = int64_t(TEMP - 2000);
     int64_t off2  = (5 * d2 * d2) >> 1;
@@ -381,7 +385,7 @@ void MS5611::spikeDetection(bool enable,
         // clamp window
         _spikeRingSize  = constrain(ringSize, 1, SPIKE_MAX_RING);
         // update threshold & count
-        if (threshold > 0.0f)          _spikeThreshold   = threshold;
+        if (threshold > 0.0f)          _spikeThreshold   = threshold * 10.0f;
         _spikeConsecNeed = max<uint8_t>(1, consecutiveCount);
 
         // fetch first real sample
@@ -394,7 +398,7 @@ void MS5611::spikeDetection(bool enable,
             _spikeBufT[i] = t0;
         }
         _spikeIdx         = 0;
-        _spikeConsecCount = 0;
+        _spikeCount       = 0;
     }
 
     _spikeWasEnabled = enable;    // remember for next call
@@ -424,18 +428,31 @@ void MS5611::spikeDetection(bool enable,
                 || (fabs(t - avgT) > _spikeThreshold);
 
     if (isSpike) {
-        _spikeConsecCount++;
-        if (_spikeConsecCount >= _spikeConsecNeed) {
+        incrementSpikeCounter();
+        if (getSpikeCounter() >= _spikeConsecNeed) {
             Serial.println(F("MS5611 Spike Detected!"));
             Serial.println("Resetting sensor...");
             delay(1000);  // give time for the user to see the message
             resetSensor();
             resetDynamics();
-            _spikeConsecCount = 0;
+            resetSpikeCounter();
         }
     } else {
-        _spikeConsecCount = 0;
+        resetSpikeCounter();
     }
+}
+
+void MS5611::incrementSpikeCounter() {
+    // Power-of-Ten rule: tiny, self-contained, no hidden side-effects
+    ++_spikeCount;
+}
+
+int MS5611::getSpikeCounter() const {
+    return _spikeCount;
+}
+
+void MS5611::resetSpikeCounter() {
+    _spikeCount = 0;
 }
 
 //// THIS SECTION IS EXPERIMENTAL AND MAY CHANGE IN FUTURE VERSIONS ////
