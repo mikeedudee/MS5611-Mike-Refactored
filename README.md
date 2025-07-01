@@ -39,10 +39,9 @@ This library extends the original MS5611 driver by Korneliusz Jarzebski with str
 * **Dynamic filtering & smoothing** via median and Kalman filters
 * **True derivative estimation** for vertical velocity and acceleration using external timestamps
 * **Spike detection** to flag or suppress sudden outliers—flags and resets the sensor once detected and then counts it
-* **Performance mode** is useful for during memory constraints or bypass overheads
+* **Performance mode** is useful for during memory constraints
 * **Manual-mode read APIs** for last getPressure() and getTemperature() values [available only if performance mode is enabled]
-* **Reference-based altitude calculation** dynamically set for user-specific reading-output
-* **Reading Anomally compensation** triggers compensation mode once an anomally in reading is detected
+* **Reference-based altitude calculation** dynamically set for user specific reading-output
 
 Some features come from or are inspired by Rob Tillaart MS5611 library.
 
@@ -222,7 +221,7 @@ Using the `getVelocity()` and `getAcceleration()` API functions.
   ```cpp
   ms5611.spikeDetection(true, 5, 10, temperature, pressure, 3);
   ```
-  - Once there is a spike for about >=< 10kPa in the pressure or in the order of temperature for three cycles, it will trigger the spike guard and reset the sensor.
+  - The spike detection works by maintaining a fixed-size ring buffer of recent pressure and temperature samples, computes their rolling mean each cycle, and flags a spike whenever the latest reading deviates from that mean by more than the configured threshold for the specified number of consecutive samples—upon which it resets the sensor and dynamics.
 
 ### Debugging (Dev-mode)
 | Function                      | Description                                                             |
