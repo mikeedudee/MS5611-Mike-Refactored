@@ -23,6 +23,8 @@
 #include <Wire.h>
 #include <MS5611.h>
 
+float referencePressure;
+
 MS5611 ms5611;
 
 void setup() 
@@ -40,6 +42,7 @@ void setup()
     delay(500);
   }
   
+  referencePressure = ms5611.readPressure();
   // Check settings
   checkSettings();
 }
@@ -48,29 +51,54 @@ void checkSettings()
 {
   Serial.print("Oversampling: ");
   Serial.println(ms5611.getOSRCode());
+
+  ms5611.enableMedianFilter(11u);
+  ms5611.enableKalmanFilter(0.5, 0.5, 0.138);
+  ms5611.resetDynamics();
 }
 
 void loop()
 {
+  unsigned long now = millis()/1000;
   // Read true temperature & Pressure (without compensation)
   double    realTemperature   = ms5611.readTemperature();
   long      realPressure      = ms5611.readPressure();
-  double    realAltitude      = ms5611.getAltitude(realPressure);
+  double    realAltitude      = ms5611.getAltitude(realPressure, referencePressure);
+  double    medianAltitude    = ms5611.medianFilter(realAltitude);
+  double    kalmanAltitude    = ms5611.kalmanFilter(realAltitude);
 
-  // Read true temperature & Pressure (with compensation)
-  double    realTemperature2  = ms5611.readTemperature(true);
-  long      realPressure2     = ms5611.readPressure(true);
+  float     velocityNormal    = ms5611.getVelocity(realAltitude, now);
+  float     accelNormal       = ms5611.getAcceleration(velocityNormal, now);
+
+  float     velocityMedian    = ms5611.getVelocity(medianAltitude, now);
+  float     acceleMedian      = ms5611.getAcceleration(velocityMedian, now);
+
+  float     velocityKalman    = ms5611.getVelocity(medianAltitude, now);
+  float     acceleKalmanedian = ms5611.getAcceleration(velocityKalman, now);
+
+  auto      performanceRead   = ms5611.performanceRead();
+  float     manualPerPres     = ms5611.getPressure();
+  float     manualPerTemp     = ms5611.getTemperature();
+
+  ms5611.spikeDetection(true);
+
+  /*// Read true temperature & Pressure (with compensation)
+  double    realTemperature2  = ms5611.getTemperature();
+  long      realPressure2     = ms5611.getPressure();
   double    realAltitude2     = ms5611.getAltitude(realPressure2);
+  double    filteredAltitude2 = updateEstimate(realAltitude2)*/
 
-  double first[3]   = {realTemperature, realPressure, realAltitude};
-  double second[3]  = {realTemperature2, realPressure2, realAltitude2}; 
+  double first[]   = {realTemperature, manualPerPres, realPressure, manualPerTemp, realAltitude, medianAltitude, kalmanAltitude, 
+  velocityMedian, velocityKalman, velocityNormal,
+  acceleMedian, acceleKalmanedian, accelNormal};
+  //double second[4]  = {realTemperature2, realPressure2, realAltitude2, filteredAltitude2}; 
 
   // Number of pairs
   const uint8_t PAIRS = sizeof(first) / sizeof(first[0]);
 
   for (int i = 0; i < 3; i++)
   {
-    if ((first[i] && second[i] == NAN) || (first[i] && second[i] == INT32_MIN))
+    if ((first[i] == NAN) || (first[i] == INT32_MIN))
     {
       Serial.print("Error reading sensor data at index: ");
       Serial.println(i);
@@ -81,12 +109,15 @@ void loop()
   // Print each pair in the format “first:second”, separated by “ | ”
   for (uint8_t i = 0; i < PAIRS; ++i) {
       Serial.print(first[i]);
-      Serial.print(':');
-      Serial.print(second[i]);
+      //Serial.print(':');
+      //Serial.print(second[i]);
       if (i < PAIRS - 1) {
           Serial.print(" | ");
       }
   }
   Serial.println();
+
+delay(100);
 }
+
 

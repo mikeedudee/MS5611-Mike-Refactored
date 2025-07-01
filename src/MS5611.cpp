@@ -44,8 +44,23 @@ SOFTWARE.
 //  CS to VCC  ==>  0x76
 //  CS to GND  ==>  0x77
 
+
+
+/*
+
+___  ___ _____ _____  ____  __   __   ___  ____ _         ______      __           _                     _ 
+|  \/  |/  ___|  ___|/ ___|/  | /  |  |  \/  (_) |        | ___ \    / _|         | |                   | |
+| .  . |\ `--.|___ \/ /___ `| | `| |  | .  . |_| | _____  | |_/ /___| |_ __ _  ___| |_ ___  _ __ ___  __| |
+| |\/| | `--. \   \ \ ___ \ | |  | |  | |\/| | | |/ / _ \ |    // _ \  _/ _` |/ __| __/ _ \| '__/ _ \/ _` |
+| |  | |/\__/ /\__/ / \_/ |_| |__| |_ | |  | | |   <  __/ | |\ \  __/ || (_| | (__| || (_) | | |  __/ (_| |
+\_|  |_/\____/\____/\_____/\___/\___/ \_|  |_/_|_|\_\___| \_| \_\___|_| \__,_|\___|\__\___/|_|  \___|\__,_|
+                              LIBRARY VERSION: 1.0.8_exp_build_01082025                   
+
+*/
+
 #include "MS5611.h"
 #include <math.h>
+#include <Arduino.h>
 
 // MS5611 class constructor
 // Default address is 0x77, uses the default Wire instance
@@ -154,67 +169,6 @@ void MS5611::resetSensor() {
 }
 
 
-int MS5611::read(uint8_t bits)
-{
-  //  VARIABLES NAMES BASED ON DATASHEET
-  //  ALL MAGIC NUMBERS ARE FROM DATASHEET
-
-  convert(MS5611_CONVERT_D1, bits);
-  if (_result) return _result;
-  //  NOTE: D1 and D2 seem reserved in MBED (NANO BLE)
-  uint32_t _D1 = readADC();
-  if (_result) return _result;
-
-  convert(MS5611_CONVERT_D2, bits);
-  if (_result) return _result;
-  uint32_t _D2 = readADC();
-  if (_result) return _result;
-
-  //  Serial.println(_D1);
-  //  Serial.println(_D2);
-
-  //  TEST VALUES - comment lines above
-  //  uint32_t _D1 = 9085466;
-  //  uint32_t _D2 = 8569150;
-
-  //  TEMP & PRESS MATH - PAGE 7/20
-  float dT = _D2 - C[5];
-  _temperature = 2000 + dT * C[6];
-
-  float offset =  C[2] + dT * C[4];
-  float sens = C[1] + dT * C[3];
-
-  if (_compensation)
-  {
-    //  SECOND ORDER COMPENSATION - PAGE 8/20
-    //  COMMENT OUT < 2000 CORRECTION IF NOT NEEDED
-    //  NOTE TEMPERATURE IS IN 0.01 C
-    if (_temperature < 2000)
-    {
-      float T2 = dT * dT * 4.6566128731E-10;
-      float t = (_temperature - 2000) * (_temperature - 2000);
-      float offset2 = 2.5 * t;
-      float sens2 = 1.25 * t;
-      //  COMMENT OUT < -1500 CORRECTION IF NOT NEEDED
-      if (_temperature < -1500)
-      {
-        t = (_temperature + 1500) * (_temperature + 1500);
-        offset2 += 7 * t;
-        sens2 += 5.5 * t;
-      }
-      _temperature -= T2;
-      offset -= offset2;
-      sens -= sens2;
-    }
-    //  END SECOND ORDER COMPENSATION
-  }
-
-  _pressure = (_D1 * sens * 4.76837158205E-7 - offset) * 3.051757813E-5;
-
-  _lastRead = millis();
-  return MS5611_READ_OK;
-}
-
 // Reads the calibration data from the MS5611 sensor's PROM
 // The calibration data is used to compensate the raw ADC readings
 // Returns true if calibration data was successfully read, false otherwise
@@ -244,6 +198,7 @@ bool MS5611::readCalibration() {
     
     return true;
 }
+
 
 // Reads the raw temperature from the MS5611 sensor
 // This function initiates a temperature conversion and waits for the result
@@ -316,10 +271,11 @@ float MS5611::readPressure(bool comp) const {
         int64_t d2    = int64_t(TEMP - 2000);
         int64_t off2  = (5 * d2 * d2) >> 1;
         int64_t sens2 = (5 * d2 * d2) >> 2;
+
         if (TEMP < -1500) {
             int64_t d22   = int64_t(TEMP + 1500);
-            off2  += 7 * d22 * d22;
-            sens2 += (11 * d22 * d22) >> 1;
+                    off2  += 7 * d22 * d22;
+                    sens2 += (11 * d22 * d22) >> 1;
         }
         OFF  -= off2;
         SENS -= sens2;
@@ -344,10 +300,58 @@ double MS5611::readTemperature(bool comp) const {
   int32_t TEMP = 2000 + (int64_t(dT) * cal_[5] >> 23);
 
   if (comp && TEMP < 2000) {
-    int64_t t2 = (int64_t(dT) * dT) >> 31;
-    TEMP     -= int32_t(t2);
+    int64_t t2    = (int64_t(dT) * dT) >> 31;
+            TEMP  -= int32_t(t2);
   }
+
   return TEMP * 0.01 + temperatureOffset_;
+}
+
+MS5611::Measure MS5611::performanceRead(bool comp)
+{
+  // grab raw ADC values
+  uint32_t D1 = readRawPressure();
+  uint32_t D2 = readRawTemperature();
+
+  if (D1 == UINT32_MAX || D2 == UINT32_MAX) {
+    // I2C error or timeout: return NAN / INT32_MIN as sentinel
+    return { NAN, (float)INT32_MIN };
+  }
+
+  // compute dT and first-order offsets/sensitivity
+  int32_t  dT   = int32_t(D2) - (int32_t(cal_[4]) << 8);
+  int64_t  OFF  = (int64_t(cal_[1]) << 16) + ((int64_t)cal_[3] * dT >> 7);
+  int64_t  SENS = (int64_t(cal_[0]) << 15) + ((int64_t)cal_[2] * dT >> 8);
+
+  // calculate “raw” temperature (in 0.01°C)
+  int32_t  TEMP = 2000 + (int64_t(dT) * cal_[5] >> 23);
+
+  // 4) optional 2nd-order compensation below 20°C
+  if (comp && TEMP < 2000) {
+    int64_t d2    = int64_t(TEMP - 2000);
+    int64_t off2  = (5 * d2 * d2) >> 1;
+    int64_t sens2 = (5 * d2 * d2) >> 2;
+
+    if (TEMP < -1500) {
+      int64_t d22     = int64_t(TEMP + 1500);
+              off2    += 7 * d22 * d22;
+              sens2   += (11 * d22 * d22) >> 1;
+    }
+
+    OFF  -= off2;
+    SENS -= sens2;
+    TEMP -= int32_t((int64_t(dT) * dT) >> 31);  // 2nd-order temp correction
+  }
+
+  // compute final pressure (mbar) and temperature (°C)
+  int32_t P = int32_t(((D1 * SENS >> 21) - OFF) >> 15);
+
+  Measure m;
+
+  m.pressure    = float(P + pressureOffset_);
+  m.temperature = double(TEMP) * 0.01 + temperatureOffset_;
+
+  return m;
 }
 
 // Calculates the altitude based on the pressure and sea level pressure
@@ -364,6 +368,76 @@ double MS5611::getSeaLevel(double p, double alt) {
 }
 
 
+/// SPIKE DETECTION API ///
+void MS5611::spikeDetection(bool enable,
+                            uint8_t ringSize,
+                            float   threshold,
+                            float   temperature,
+                            float   pressure,
+                            uint8_t consecutiveCount)
+{
+    // 1) On real enable-transition or window-size change: seed buffers & reset counters
+    if ( enable && (! _spikeWasEnabled || ringSize != _spikeRingSize) ) {
+        // clamp window
+        _spikeRingSize  = constrain(ringSize, 1, SPIKE_MAX_RING);
+        // update threshold & count
+        if (threshold > 0.0f)          _spikeThreshold   = threshold;
+        _spikeConsecNeed = max<uint8_t>(1, consecutiveCount);
+
+        // fetch first real sample
+        float p0 = isnan(pressure)    ? readPressure()    : pressure;
+        float t0 = isnan(temperature) ? readTemperature() : temperature;
+
+        // seed circular buffers
+        for (uint8_t i = 0; i < _spikeRingSize; ++i) {
+            _spikeBufP[i] = p0;
+            _spikeBufT[i] = t0;
+        }
+        _spikeIdx         = 0;
+        _spikeConsecCount = 0;
+    }
+
+    _spikeWasEnabled = enable;    // remember for next call
+
+    // 2) If disabled, bail out
+    if (!enable) return;
+
+    // 3) Read or use overrides
+    float p = isnan(pressure)    ? readPressure()    : pressure;
+    float t = isnan(temperature) ? readTemperature() : temperature;
+
+    // 4) Update buffer & compute rolling mean
+    _spikeBufP[_spikeIdx] = p;
+    _spikeBufT[_spikeIdx] = t;
+    _spikeIdx = (_spikeIdx + 1) % _spikeRingSize;
+
+    float sumP = 0, sumT = 0;
+    for (uint8_t i = 0; i < _spikeRingSize; ++i) {
+        sumP += _spikeBufP[i];
+        sumT += _spikeBufT[i];
+    }
+    float avgP = sumP / _spikeRingSize;
+    float avgT = sumT / _spikeRingSize;
+
+    // 5) Detect & count consecutive spikes
+    bool isSpike = (fabs(p - avgP) > _spikeThreshold)
+                || (fabs(t - avgT) > _spikeThreshold);
+
+    if (isSpike) {
+        _spikeConsecCount++;
+        if (_spikeConsecCount >= _spikeConsecNeed) {
+            Serial.println(F("MS5611 Spike Detected!"));
+            Serial.println("Resetting sensor...");
+            delay(1000);  // give time for the user to see the message
+            resetSensor();
+            resetDynamics();
+            _spikeConsecCount = 0;
+        }
+    } else {
+        _spikeConsecCount = 0;
+    }
+}
+
 //// THIS SECTION IS EXPERIMENTAL AND MAY CHANGE IN FUTURE VERSIONS ////
 
 // Returns the device ID, which is a unique identifier for the MS5611 sensor
@@ -379,87 +453,64 @@ uint16_t MS5611::getSerialCode() const {
   return (readRegister16(MS5611_READ_PROM + (7 << 1)) >> 4) & 0x0FFF;
 }
 
-
-void MS5611::convert(const uint8_t addr, uint8_t bits)
-{
-  //  values from page 3 datasheet - MAX column (rounded up)
-  uint16_t del[5] = {600, 1200, 2300, 4600, 9100};
-
-  uint8_t index = bits;
-  if (index < 8) index = 8;
-  else if (index > 12) index = 12;
-  index -= 8;
-  uint8_t offset = index * 2;
-  command(addr + offset);
-
-  uint16_t waitTime = del[index];
-  uint32_t start = micros();
-  //  while loop prevents blocking RTOS
-  while (micros() - start < waitTime)
-  {
-    yield();
-    delayMicroseconds(10);
-  }
-}
-
-uint16_t MS5611::readProm(uint8_t reg)
-{
+uint16_t MS5611::readProm(uint8_t reg) {
   //  last EEPROM register is CRC - Page 13 datasheet.
   uint8_t promCRCRegister = 7;
   if (reg > promCRCRegister) return 0;
 
   uint8_t offset = reg * 2;
   command(MS5611_READ_PROM + offset);
-  if (_result == 0)
-  {
+
+  if (_result == 0) {
     uint8_t length = 2;
     int bytes = wire_->requestFrom(address_, length);
-    if (bytes >= length)
-    {
-      uint16_t value = wire_->read() * 256;
-      value += wire_->read();
+
+    if (bytes >= length) {
+      uint16_t  value = wire_->read() * 256;
+                value += wire_->read();
+
       return value;
     }
+
     return 0;
   }
+
   return 0;
 }
 
-uint32_t MS5611::readADC()
-{
+uint32_t MS5611::readADC() {
   command(MS5611_READ_ADC);
-  if (_result == 0)
-  {
+  if (_result == 0) {
     uint8_t length = 3;
     int bytes = wire_->requestFrom(address_, length);
-    if (bytes >= length)
-    {
-      uint32_t value = wire_->read() * 65536UL;
-      value += wire_->read() * 256UL;
-      value += wire_->read();
+
+    if (bytes >= length) {
+      uint32_t  value = wire_->read() * 65536UL;
+                value += wire_->read() * 256UL;
+                value += wire_->read();
+
       return value;
     }
+
     return 0UL;
   }
+
   return 0UL;
 }
 
-int MS5611::command(const uint8_t command)
-{
+int MS5611::command(const uint8_t command) {
   yield();
   wire_->beginTransmission(address_);
   wire_->write(command);
   _result = wire_->endTransmission();
+
   return _result;
 }
 
-//       DEVELOP
-uint16_t MS5611::getProm(uint8_t index)
-{
+uint16_t MS5611::getProm(uint8_t index) {
   return readProm(index);
 }
 
-uint16_t MS5611::getCRC()
-{
+uint16_t MS5611::getCRC() {
   return readProm(7) & 0x0F;
 }

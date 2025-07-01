@@ -76,7 +76,7 @@ MS5611 Library Mike Refactored Version 1.0.4_exp_build_29072025 | 29 Jun 2025
 - `getPROM()` — Access to PROM calibration coefficients.
 - `getCRC()` — Computes and returns CRC from PROM.
 - Automatic correction for anomalous pressure values.
-- Added multiple example sketches.
+- Added multiple example sketches to illustrate advanced usage.
 
 ---
 
