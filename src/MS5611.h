@@ -2,9 +2,9 @@
 
 The MIT License
 
-Copyright (c) 2014-2023 Korneliusz Jarzębski
-Copyright (c) 2023–2025 Rob Tillaart
-Copyright (c) 2025 Francis Mike John Camogao [Refactor/Enhancements]
+    Copyright (c) 2014-2023 Korneliusz Jarzębski
+    Copyright (c) 2023–2025 Rob Tillaart
+    Copyright (c) 2025 Francis Mike John Camogao [Refactor/Enhancements]
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -44,6 +44,18 @@ SOFTWARE.
 //  CS to VCC  ==>  0x76
 //  CS to GND  ==>  0x77
 
+/*
+
+___  ___ _____ _____  ____  __   __   ___  ____ _         ______      __           _                     _ 
+|  \/  |/  ___|  ___|/ ___|/  | /  |  |  \/  (_) |        | ___ \    / _|         | |                   | |
+| .  . |\ `--.|___ \/ /___ `| | `| |  | .  . |_| | _____  | |_/ /___| |_ __ _  ___| |_ ___  _ __ ___  __| |
+| |\/| | `--. \   \ \ ___ \ | |  | |  | |\/| | | |/ / _ \ |    // _ \  _/ _` |/ __| __/ _ \| '__/ _ \/ _` |
+| |  | |/\__/ /\__/ / \_/ |_| |__| |_ | |  | | |   <  __/ | |\ \  __/ || (_| | (__| || (_) | | |  __/ (_| |
+\_|  |_/\____/\____/\_____/\___/\___/ \_|  |_/_|_|\_\___| \_| \_\___|_| \__,_|\___|\__\___/|_|  \___|\__,_|
+                              LIBRARY VERSION: 1.0.8_exp_build_01082025                   
+
+*/
+
 #pragma once // Ensures this header file is included only once
 // Project name: MS5611 Sensor Library
 
@@ -51,9 +63,18 @@ SOFTWARE.
 #include <Arduino.h>
 #include <Wire.h>
 
-#define MS5611_LIB_VERSION          (F("1.0.4_exp_build_29072025"))
-#define ENVIRONMENT_COMPT           (F("Teensy 4.1. Incompatibility might occur with other boards."))
+// Inlcude Filter & Velocity/Acceleration Libraries
+#include "filters/median_filter.h"
+#include "filters/kalman_filter.h"
+#include "derivative_estimator.h"
+
+#define MS5611_LIB_VERSION          (F("1.0.8_exp_build_01082025"))
+#define ENVIRONMENT_COMPT           (F("Teensy 4.1. Incompatibility might occur with other boards. Please do note that this library is maintained and solely developed independently. Bugs or incompatibility may occur at your instance; if so, please report to me immediately."))
 #define MS5611_READ_OK              0
+#define AUTHOR                      (F("Copyright (c) 2025 Francis Mike John Camogao [Refactor/Enhancements]"))
+#define LIBRARY_NAME                (F("MS5611-Mike-Refactored"))
+#define LIBRARY_URL                 (F("https://github.com/mikeedudee/MS5611-Mike-Refactored.git"))
+#define LIBRARY_DESCRIPTION         (F("A library for the MS5611 pressure sensor, providing high-resolution temperature and pressure readings with optional compensation. This library exclusively supports the I2C interface. It is a refactored and enhanced version originally based on the library by Korneliusz Jarzebski. Structural improvements, optimizations, and additional features have been incorporated, including expanded API support. Several functions and design elements are adapted from or inspired by Rob Tillaart's MS5611 library, integrated with further modifications for improved performance and usability."))
 
         // Enum for oversampling rates; these control the resolution and power consumption
         // Higher values yield better resolution but consume more power and take longer to read
@@ -73,8 +94,20 @@ class MS5611 {
             AppNote   = 1
         };
 
+        /// Do a measurement cycle and return both values at once
+        struct Measure { 
+            double temperature;  // °C
+            float  pressure;     // mbar
+        };
+
+        /// Read both temperature & pressure in one go.
+        /// @param comp  if true, apply 2nd-order (low-temp) compensation
+        Measure performanceRead(bool compensate = false);
+
+
         // Default: Wire @ 0x77
         MS5611();
+
         // Custom I²C address / bus
         MS5611(uint8_t address, TwoWire &wirePort = Wire);
 
@@ -85,10 +118,14 @@ class MS5611 {
         // Raw ADC reads (blocking)
         uint32_t readRawTemperature();
         uint32_t readRawPressure();
+        
 
         // Calibrated values
-        double  readTemperature(bool compensate = false) const;
-        float   readPressure   (bool compensate = false) const;
+        double  readTemperature (bool compensate = true) const;
+        float   readPressure    (bool compensate = true) const;
+        float   simultaneousRead(bool compensate = true) const;;
+        double  getTemperature  (bool compensate = true) { return performanceRead(compensate).temperature; }
+        float   getPressure     (bool compensate = true) { return performanceRead(compensate).pressure;    }
 
         // Helpers
         static double getAltitude(double pressure, double seaLevelPressure = 101325.0);
@@ -106,8 +143,8 @@ class MS5611 {
         // Oversampling introspection
         void         setOversampling(Oversampling osr) { osr_ = osr; }                              // Set oversampling rate
         Oversampling getOversampling()        const    { return osr_; }                             // Get current oversampling rate
-        uint8_t      getOSRCode()             const    { return static_cast<uint8_t>(osr_); }       // Get OSR code (0-4) for conversion commands
-        uint16_t     getConvTimeMs()          const    {                                            // Get conversion time in milliseconds based on the current OSR
+        uint8_t      getOSRCode     ()        const    { return static_cast<uint8_t>(osr_); }       // Get OSR code (0-4) for conversion commands
+        uint16_t     getConvTimeMs  ()        const    {                                            // Get conversion time in milliseconds based on the current OSR
             return MS5611_CONVERSION_TIMEOUT_MS[uint8_t(osr_) >> 1];
         }
 
@@ -122,6 +159,78 @@ class MS5611 {
         int         command(const uint8_t command);                     // Send command to the sensor
         uint16_t    getProm(uint8_t index);                             // Read PROM coefficient at specified index (0-6)    
         uint16_t    getCRC();                                           // Calculate CRC4 checksum for the PROM coefficients
+
+        uint16_t    getLastRead() const { return _lastRead; }           // Get timestamp of the last read operation
+        uint16_t    getResult() const { return _result; }               // Get result of the last operation (0 = success, non-zero = error)
+
+        /// MEDIAN FILTER ///
+        bool enableMedianFilter(uint8_t ws = 5u) {
+            enabledMedian_ = median_.setWindowSize(ws);
+            
+            return enabledMedian_;
+        }
+
+        /// Read the latest filtered altitude
+        float medianFilter(float base_value) {
+            float raw = base_value;
+
+            return enabledMedian_
+                ? median_.update(raw)
+                : raw;
+        }
+
+        /// KALMAN FILTER ///
+        /// Enable Kalman filtering with specified uncertainties
+        /// e_mea: measurement uncertainty (>0)
+        /// e_est: estimation uncertainty (≥0)
+        /// q:     process noise (≥0)
+        /// Returns true if parameters valid
+        bool enableKalmanFilter(float e_mea = 1.0f,
+                                float e_est = 1.0f,
+                                float q     = 0.01f) {
+            enabledKalman_ = kalman_.setParameters(e_mea, e_est, q);
+
+            return enabledKalman_;
+        }
+
+        /// Read the latest filtered altitude (Kalman)
+        float kalmanFilter(float base_value) {
+            float raw = base_value;
+
+            return enabledKalman_
+                ? kalman_.update(raw)
+                : raw;
+        }
+
+        /// VELOCITY/ACCELERATION COMPUTE ///
+        float getVelocity(float altitude, float timeSec) {
+            return _velEstimator.update(altitude, timeSec);
+        }
+
+        /// Compute vertical acceleration [m/s²] from any velocity sample
+        float getAcceleration(float velocity, float timeSec) {
+            return _accEstimator.update(velocity, timeSec);
+        }
+
+        /// Reset both estimators (e.g. after changing filters)
+        void resetDynamics() {
+            _velEstimator.reset();
+            _accEstimator.reset();
+        }
+
+        // ─── Unified spikeDetection API ───
+        //   enable:            on/off
+        //   ringSize:          1…SPIKE_MAX_RING      (default 5)
+        //   threshold:         >0                    (default 1.0f)
+        //   temperature:       NAN → readTemperature()
+        //   pressure:          NAN → readPressure()
+        //   consecutiveCount:  spikes in a row before reset (default 1)
+        void spikeDetection(bool enable = false,
+                            uint8_t ringSize          = 5,
+                            float   threshold         = 100.0f,
+                            float   temperature       = NAN,
+                            float   pressure          = NAN,
+                            uint8_t consecutiveCount  = 5);
 
     private:
         // I2C command and address constants
@@ -145,17 +254,40 @@ class MS5611 {
         double          temperatureOffset_;         // user offset °C
         uint32_t        deviceID_;                  // XOR of PROM words
 
-        int32_t         _temperature;               // Temperature in hundredths of degrees Celsius
-        int32_t         _pressure;                  // Pressure in hundredths of mbar
         int             _result;                    // Result of the last operation (0 = success, non-zero = error)
         float           C[7];                       // Calibration coefficients for second-order compensation
         uint32_t        _lastRead;                  // Timestamp of the last read operation
         uint32_t        _deviceID;                  // Device ID calculated from the PROM coefficients
-        bool            _compensation;              // Flag to indicate if second-order compensation is applied
 
         int64_t OFF2 = 0, SENS2 = 0, TEMP2 = 0;     // second‐order terms
         
         // Low-level I2C communication method
         uint16_t    readRegister16(uint8_t reg)     const;    // Read 16-bit register value
         uint32_t    readRegister24(uint8_t reg)     const;    // Read 24-bit register value
+
+        // Derivative estimators for velocity and acceleration
+        DerivativeEstimator _velEstimator;
+        DerivativeEstimator _accEstimator;
+
+        // Filters
+        MedianFilter        median_;
+        KalmanFilter        kalman_;
+        bool                enabledMedian_ = false;
+        bool                enabledKalman_ = false;
+
+        /// Spike‐Detection API ///  
+        // compile-time maximum buffer size
+        static constexpr uint8_t SPIKE_MAX_RING = 20;
+
+        bool     _spikeEnabled     = false;
+        bool     _spikeWasEnabled  = false;
+        uint8_t  _spikeRingSize    = 5;
+        float    _spikeThreshold   = 1.0f;
+        uint8_t  _spikeIdx         = 0;
+        float    _spikeBufP[SPIKE_MAX_RING]{};
+        float    _spikeBufT[SPIKE_MAX_RING]{};
+
+        // new members for N-in-a-row logic:
+        uint8_t  _spikeConsecNeed  = 0;
+        uint8_t  _spikeConsecCount = 0;
 };
