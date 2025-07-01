@@ -9,8 +9,18 @@ void setup() {
   Serial.println(__FILE__);
   Serial.print("MS5611_LIB_VERSION: ");
   Serial.println(MS5611_LIB_VERSION);
+  Serial.print("LIBRAY AUTHOR: ");
+  Serial.println(AUTHOR);
+  Serial.print("LIBRAY NAME: ");
+  Serial.println(LIBRARY_NAME);
+  Serial.print("LIBRAY DESCRIPTION: ");
+  Serial.println(LIBRARY_DESCRIPTION);
+  Serial.print("LIBRAY URL: ");
+  Serial.println(LIBRARY_URL);
   Serial.print("TESTED ENVIRONMENT: ");
   Serial.println(ENVIRONMENT_COMPT);
+  Serial.println();
+  Serial.println();
   Serial.print("Manufacturer ID: ");
   Serial.println(ms5611.getManufacturer());
   Serial.print("Serial Code: ");
@@ -19,6 +29,10 @@ void setup() {
   Serial.println(ms5611.getDeviceID(), HEX);
   Serial.print("Sensor Address: ");
   Serial.println(ms5611.getAddress());
+  Serial.print("Last Read State: ");
+  Serial.println(ms5611.getLastRead());
+  Serial.print("Result of the last operation (0 = success, non-zero = error): ");
+  Serial.println(ms5611.getResult());
 
   pinMode(LED_BUILTIN, OUTPUT);
 
@@ -33,6 +47,7 @@ void setup() {
   Serial.println(ms5611.readCalibration());
   Serial.print(" | ADC State: ");
   Serial.println(ms5611.readADC());
+
   Serial.println();
 
   digitalWrite(LED_BUILTIN, 1);
@@ -42,9 +57,9 @@ void setup() {
   Serial.print("Raw Pressure Reading: ");
   Serial.println(ms5611.readRawPressure());
   Serial.print("Calibrated Temperature Reading: ");
-  Serial.println(ms5611.readTemperature());
+  Serial.println(ms5611.readTemperature(true));
   Serial.print("Calibrated Pressure Reading: ");
-  double Pressure = ms5611.readPressure();
+  double Pressure = ms5611.readPressure(true);
   Serial.println(Pressure);
   Serial.print("Calculated Altitude: ");
   double Altitude = ms5611.getAltitude(Pressure, 101325); // 101325 Standard sea level atmospheric pressure
