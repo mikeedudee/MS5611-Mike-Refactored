@@ -69,12 +69,12 @@ ___  ___ _____ _____  ____  __   __   ___  ____ _         ______      __        
 #include "derivative_estimator.h"
 
 #define MS5611_LIB_VERSION          (F("1.0.8_exp_build_01082025"))
-#define ENVIRONMENT_COMPT           (F("Teensy 4.1. Incompatibility might occur with other boards. Please do note that this library is maintained and solely developed independently. Bugs or incompatibility may occur at your instance; if so, please report to me immediately."))
-#define MS5611_READ_OK              0
-#define AUTHOR                      (F("Copyright (c) 2025 Francis Mike John Camogao [Refactor/Enhancements]"))
-#define LIBRARY_NAME                (F("MS5611-Mike-Refactored"))
-#define LIBRARY_URL                 (F("https://github.com/mikeedudee/MS5611-Mike-Refactored.git"))
-#define LIBRARY_DESCRIPTION         (F("A library for the MS5611 pressure sensor, providing high-resolution temperature and pressure readings with optional compensation. This library exclusively supports the I2C interface. It is a refactored and enhanced version originally based on the library by Korneliusz Jarzebski. Structural improvements, optimizations, and additional features have been incorporated, including expanded API support. Several functions and design elements are adapted from or inspired by Rob Tillaart's MS5611 library, integrated with further modifications for improved performance and usability."))
+#define MS5611_ENVIRONMENT_COMPT    (F("Teensy 4.1. Incompatibility might occur with other boards. Please do note that this library is maintained and solely developed independently. Bugs or incompatibility may occur at your instance; if so, please report to me immediately."))
+#define MS5611_AUTHOR               (F("Copyright (c) 2025 Francis Mike John Camogao [Refactor/Enhancements]"))
+#define MS5611_LIBRARY_NAME         (F("MS5611-Mike-Refactored"))
+#define MS5611_LIBRARY_URL          (F("https://github.com/mikeedudee/MS5611-Mike-Refactored.git"))
+#define MS5611_LIBRARY_DESCRIPTION  (F("A library for the MS5611 pressure sensor, providing high-resolution temperature and pressure readings with optional compensation. This library exclusively supports the I2C interface. It is a refactored and enhanced version originally based on the library by Korneliusz Jarzebski. Structural improvements, optimizations, and additional features have been incorporated, including expanded API support. Several functions and design elements are adapted from or inspired by Rob Tillaart's MS5611 library, integrated with further modifications for improved performance and usability."))
+#define MS5611_LIBRARY_LICENSE      (F("MIT License - see LICENSE file for details."))
 
         // Enum for oversampling rates; these control the resolution and power consumption
         // Higher values yield better resolution but consume more power and take longer to read
@@ -218,7 +218,7 @@ class MS5611 {
         //   threshold:         >0                    (default 1.0f)
         //   temperature:       NAN → readTemperature()
         //   pressure:          NAN → readPressure()
-        //   consecutiveCount:  spikes in a row before reset (default 1)
+        //   consecutiveCount:  spikes in a row before reset (default 5)
         void spikeDetection(bool enable = false,
                             uint8_t ringSize          = 5,
                             float   threshold         = 10.0f,
