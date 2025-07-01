@@ -101,67 +101,61 @@ class MS5611 {
         };
 
         /// Read both temperature & pressure in one go.
-        /// @param comp  if true, apply 2nd-order (low-temp) compensation
-        Measure performanceRead(bool compensate = false);
+        /// if true, apply 2nd-order (low-temp) compensation
+        Measure performanceRead (bool compensate = false);
 
-
-        // Default: Wire @ 0x77
-        MS5611();
-
-        // Custom I²C address / bus
-        MS5611(uint8_t address, TwoWire &wirePort = Wire);
+        MS5611                  ();                                             // Default: Wire @ 0x77
+        MS5611                  (uint8_t address, TwoWire &wirePort = Wire);    // Custom I²C address / bus
 
         // Reset, read PROM (+CRC), choose OSR & math mode
         bool begin(Oversampling osr   = HIGH_RES,
                    MathMode     math  = MathMode::Datasheet);
 
         // Raw ADC reads (blocking)
-        uint32_t readRawTemperature();
-        uint32_t readRawPressure();
+        uint32_t        readRawTemperature  ();
+        uint32_t        readRawPressure     ();
         
-
         // Calibrated values
-        double  readTemperature (bool compensate = true) const;
-        float   readPressure    (bool compensate = true) const;
-        float   simultaneousRead(bool compensate = true) const;;
-        double  getTemperature  (bool compensate = true) { return performanceRead(compensate).temperature; }
-        float   getPressure     (bool compensate = true) { return performanceRead(compensate).pressure;    }
+        double          readTemperature     (bool compensate = true) const;
+        float           readPressure        (bool compensate = true) const;
+        double          getTemperature      (bool compensate = true) { return performanceRead(compensate).temperature; }
+        float           getPressure         (bool compensate = true) { return performanceRead(compensate).pressure;    }
 
         // Helpers
-        static double getAltitude(double pressure, double seaLevelPressure = 101325.0);
-        static double getSeaLevel(double pressure, double altitude);
+        static double   getAltitude         (double pressure, double seaLevelPressure = 101325.0);
+        static double   getSeaLevel         (double pressure, double altitude);
 
         // Offsets & IDs
-        void     setPressureOffset   (int32_t mbar) { pressureOffset_    = mbar; }                  // Set pressure offset in mbar
-        void     setTemperatureOffset(double degC ) { temperatureOffset_ = degC; }                  // Set temperature offset in degrees Celsius
-        uint32_t getDeviceID         () const       { return deviceID_; }                           // Get device ID (XOR of PROM words)
-        uint16_t getManufacturer     () const;                                                      // Declare getManufacturer() const; // Get manufacturer code (first PROM word)
-        uint16_t getSerialCode       () const;                                                      // Declare getSerialCode() const; // Get serial code (last PROM word shifted right by 4 bits)
-        uint16_t getAddress          () const       { return address_; }                            // Get I2C address (0x76 or 0x77)
+        void            setPressureOffset   (int32_t mbar)      { pressureOffset_    = mbar; }               // Set pressure offset in mbar
+        void            setTemperatureOffset(double degC )      { temperatureOffset_ = degC; }               // Set temperature offset in degrees Celsius
+        uint32_t        getDeviceID         () const            { return deviceID_; }                        // Get device ID (XOR of PROM words)
+        uint16_t        getManufacturer     () const;                                                        // Declare getManufacturer() const; // Get manufacturer code (first PROM word)
+        uint16_t        getSerialCode       () const;                                                        // Declare getSerialCode() const; // Get serial code (last PROM word shifted right by 4 bits)
+        uint16_t        getAddress          () const            { return address_; }                         // Get I2C address (0x76 or 0x77)
             
 
         // Oversampling introspection
-        void         setOversampling(Oversampling osr) { osr_ = osr; }                              // Set oversampling rate
-        Oversampling getOversampling()        const    { return osr_; }                             // Get current oversampling rate
-        uint8_t      getOSRCode     ()        const    { return static_cast<uint8_t>(osr_); }       // Get OSR code (0-4) for conversion commands
-        uint16_t     getConvTimeMs  ()        const    {                                            // Get conversion time in milliseconds based on the current OSR
+        void            setOversampling     (Oversampling osr)  { osr_ = osr; }                              // Set oversampling rate
+        Oversampling    getOversampling     () const            { return osr_; }                             // Get current oversampling rate
+        uint8_t         getOSRCode          () const            { return static_cast<uint8_t>(osr_); }       // Get OSR code (0-4) for conversion commands
+        uint16_t        getConvTimeMs       () const            {                                            // Get conversion time in milliseconds based on the current OSR
             return MS5611_CONVERSION_TIMEOUT_MS[uint8_t(osr_) >> 1];
         }
 
         // Low-level I2C communication method
-        void        resetSensor();                                      // Send reset over I2C
-        bool        readCalibration();                                  // Read PROM and verify CRC4
-        void        convert(const uint8_t addr, uint8_t bits);          // Start conversion with specified address and bits
-        int         read(uint8_t bits);                                 // Read ADC value with specified oversampling bits  
-        inline int  read() { return read( (uint8_t) HIGH_RES); };       // Default to HIGH_RES
-        uint32_t    readADC();                                          // Read ADC value (24-bit) from the sensor
-        uint16_t    readProm(uint8_t reg);                              // Read PROM register (16-bit) from the sensor
-        int         command(const uint8_t command);                     // Send command to the sensor
-        uint16_t    getProm(uint8_t index);                             // Read PROM coefficient at specified index (0-6)    
-        uint16_t    getCRC();                                           // Calculate CRC4 checksum for the PROM coefficients
+        void            resetSensor         ();                                                             // Send reset over I2C
+        bool            readCalibration     ();                                                             // Read PROM and verify CRC4
+        void            convert             (const uint8_t addr, uint8_t bits);                             // Start conversion with specified address and bits
+        int             read                (uint8_t bits);                                                 // Read ADC value with specified oversampling bits  
+        inline int      read                () { return read( (uint8_t) HIGH_RES); };                       // Default to HIGH_RES
+        uint32_t        readADC             ();                                                             // Read ADC value (24-bit) from the sensor
+        uint16_t        readProm            (uint8_t reg);                                                  // Read PROM register (16-bit) from the sensor
+        int             command             (const uint8_t command);                                        // Send command to the sensor
+        uint16_t        getProm             uint8_t index);                                                 // Read PROM coefficient at specified index (0-6)    
+        uint16_t        getCRC              ();                                                             // Calculate CRC4 checksum for the PROM coefficients
 
-        uint16_t    getLastRead() const { return _lastRead; }           // Get timestamp of the last read operation
-        uint16_t    getResult() const { return _result; }               // Get result of the last operation (0 = success, non-zero = error)
+        uint16_t        getLastRead         () const { return _lastRead; }                                  // Get timestamp of the last read operation
+        uint16_t        getResult           () const { return _result; }                                    // Get result of the last operation (0 = success, non-zero = error)
 
         /// MEDIAN FILTER ///
         bool enableMedianFilter(uint8_t ws = 5u) {
@@ -187,9 +181,9 @@ class MS5611 {
         /// Returns true if parameters valid
         bool enableKalmanFilter(float e_mea = 1.0f,
                                 float e_est = 1.0f,
-                                float q     = 0.01f) {
+                                float q     = 0.01f) 
+        {
             enabledKalman_ = kalman_.setParameters(e_mea, e_est, q);
-
             return enabledKalman_;
         }
 
@@ -232,17 +226,11 @@ class MS5611 {
                             float   pressure          = NAN,
                             uint8_t consecutiveCount  = 5);
 
-        // call this whenever you detect a spike
-        void incrementSpikeCounter();
-
-        // get how many spikes have occurred so far
-        int  getSpikeCounter() const;
-
-        // reset count back to zero
-        void resetSpikeCounter();
-
-        // Returns how many times resetSensor() has been called
-        int  getResetCount() const { return _resetCount; }
+        
+        void incrementSpikeCounter  ();                                     // call this whenever you detect a spike     
+        int  getSpikeCounter        () const;                               // get how many spikes have occurred so far  
+        void resetSpikeCounter      ();                                     // reset count back to zero
+        int  getResetCount          () const { return _resetCount; }        // Returns how many times resetSensor() has been called
 
 
     private:
@@ -285,25 +273,25 @@ class MS5611 {
         // Filters
         MedianFilter        median_;
         KalmanFilter        kalman_;
-        bool                enabledMedian_ = false;
-        bool                enabledKalman_ = false;
+        bool                enabledMedian_          = false;
+        bool                enabledKalman_          = false;
 
         /// Spike‐Detection API ///  
         // compile-time maximum buffer size
-        static constexpr uint8_t SPIKE_MAX_RING = 20;
+        static constexpr uint8_t SPIKE_MAX_RING     = 20;
 
-        bool     _spikeEnabled     = false;
-        bool     _spikeWasEnabled  = false;
-        uint8_t  _spikeRingSize    = 5;
-        float    _spikeThreshold   = 1.0f;
-        uint8_t  _spikeIdx         = 0;
-        float    _spikeBufP[SPIKE_MAX_RING]{};
-        float    _spikeBufT[SPIKE_MAX_RING]{};
+        bool                    _spikeEnabled       = false;
+        bool                    _spikeWasEnabled    = false;
+        uint8_t                 _spikeRingSize      = 5;
+        float                   _spikeThreshold     = 1.0f;
+        uint8_t                 _spikeIdx           = 0;
+        float                   _spikeBufP[SPIKE_MAX_RING]{};
+        float                   _spikeBufT[SPIKE_MAX_RING]{};
 
         // new members for N-in-a-row logic:
         uint8_t  _spikeConsecNeed  = 0;
         int      _spikeCount       = 0;
         
         // counter for resets
-        int _resetCount = 0;
+        int      _resetCount       = -1;  // Start at -1 to account for the first reset in begin()
 };
