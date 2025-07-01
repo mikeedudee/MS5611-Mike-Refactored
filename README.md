@@ -42,6 +42,7 @@ This library extends the original MS5611 driver by Korneliusz Jarzebski with str
 * **Performance mode** is useful for during memory constraints or bypass overheads
 * **Manual-mode read APIs** for last getPressure() and getTemperature() values [available only if performance mode is enabled]
 * **Reference-based altitude calculation** dynamically set for user-specific reading-output
+* **Reading Anomally compensation** triggers compensation mode once an anomally in reading is detected
 
 Some features come from or are inspired by Rob Tillaart MS5611 library.
 
