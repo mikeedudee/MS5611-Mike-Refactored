@@ -201,7 +201,7 @@ Using the `getVelocity()` and `getAcceleration()` API functions.
 
 | Function                                           | Description                                                             | Sample Usage
 | -------------------------------------------------- | ----------------------------------------------------------------------- | ------------
-| `spikeDetection(bool enable, uint8_t ringSize, float threshold, temperature, pressure, uint8_t consecutiveCount);`                      | Toggle outlier detection/suppression. Automatically resets the MS5611 sensor once anomally is detected (1 second delay) before resets.                                    |
+| `spikeDetection(bool enable, uint8_t ringSize, float threshold, temperature, pressure, uint8_t consecutiveCount);`                      | Toggle outlier detection/suppression. Automatically resets the MS5611 sensor once anomally is detected (1 second delay) before resets.                                    | *See description below*
 | `readRawTemperature()`          | Raw temperature ADC value               |  `Serial.println(ms5611.readRawTemperature());`
 | `readRawPressure()`             | Raw pressure ADC value                  |  `Serial.println(ms5611.readRawPressure());`
 | `getAltitude(int32_t pressure, float refPressure)` | Altitude relative to reference (m)                                      | `ms5611.getAltitude(Pressure);`
