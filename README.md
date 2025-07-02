@@ -235,7 +235,7 @@ Using the `getVelocity()` and `getAcceleration()` API functions.
 | `MS5611_ENVIRONMENT_COMPT`    | returns the library's tested environment
 | `getManufacturer()`           | returns manufacturer private info | 
 | `getSerialCode()`             | returns serialCode from the PROM\[7] minus the CRC |
-| `getOSRCode()`                | return the raw OSR command code (0x00,0x02,0x04,0x06,0x08) |
+| `getOSRCode()`                | return the raw OSR command code |
 | `getConvTimeMs()`             | return the conversion time (ms) for the current OSR |
 | `getAddress()`                | return I2C Address |
 | `getDeviceID()`               | return device ID (XOR of PROM words) |
