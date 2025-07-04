@@ -151,7 +151,7 @@ class MS5611 {
         uint32_t        readADC             ();                                                             // Read ADC value (24-bit) from the sensor
         uint16_t        readProm            (uint8_t reg);                                                  // Read PROM register (16-bit) from the sensor
         int             command             (const uint8_t command);                                        // Send command to the sensor
-        uint16_t        getProm             uint8_t index);                                                 // Read PROM coefficient at specified index (0-6)    
+        uint16_t        getProm             (uint8_t index);                                                 // Read PROM coefficient at specified index (0-6)    
         uint16_t        getCRC              ();                                                             // Calculate CRC4 checksum for the PROM coefficients
 
         uint16_t        getLastRead         () const { return _lastRead; }                                  // Get timestamp of the last read operation
