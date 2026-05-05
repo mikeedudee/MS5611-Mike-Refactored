@@ -104,15 +104,6 @@ MS5611 Library Mike Refactored Version 1.0.8_exp_build_01082025 | 01 Jul 2025
     - `void resetDynamics();`  
     - `double medianFilter(double input);`  
     - `double kalmanFilter(double input);`  
-- **General Addition**
-  - Author description: `AUTHOR`
-  - Library URL: `LIBRARY_URL`
-  - Library Name: `LIBRARY_NAME`
-  - Library description: `LIBRARY_DESCRIPTION`
-  - Library Version: `MS5611_LIB_VERSION`
-  - Library License: `MS5611_LIBRARY_LICENSE`
-  - `getLastRead()` - Get timestamp of the last read operation
-  - `getResult()` - Get result of the last operation (0 = success, non-zero = error)
 
 - **Derivative estimation**  
   - `float getVelocity(double altitude, unsigned long timestamp);`  
@@ -144,4 +135,29 @@ MS5611 Library Mike Refactored Version 1.0.8_exp_build_01082025 | 01 Jul 2025
 ### Optimized
 - **Noise reduction** via median and Kalman filtering for more stable altitude outputs  
 - **Derivative estimator** now uses external time input for accurate velocity/acceleration  
-- **performanceRead()** added for throughput benchmarking of sensor reads  or for fast pace analysis.
+- **performanceRead()** added for throughput benchmarking of sensor reads  
+
+
+MS5611 Library Mike Refactored Version 1.2.5_exp_build_04162026 | 26 Apr 2026
+======================================================================
+### Added
+- **SPI Interface Support (Feature 5):** Introduced a new constructor `MS5611(int8_t csPin, SPIClass &spiPort)` to support push-pull SPI hardware for high-vibration/high-EMI aerospace environments. The library now dynamically routes data through either I2C or SPI based on instantiation.
+- **Asynchronous / Non-Blocking API (Feature 1):** Added `startTemperature()`, `startPressure()`, `isConversionComplete()`, and `getConversionValue()` to allow split-phase sensor reads. The main flight loop can now execute other RTOS tasks without being blocked by `delay()` during the up to 9.04ms ADC conversion times.
+- **Diagnostic Health Bitmask (Feature 6):** Implemented a 16-bit `_healthStatus` register to persistently log and track system anomalies concurrently (e.g., `STATUS_BUS_ERROR`, `STATUS_PHYSICS_VIOLATION`, `STATUS_SPIKE_DETECTED`). 
+- **Physical Range Validation (Feature 2):** Added `validatePhysics(temp, pressure)` to act as a sanity check against sensor hardware failure or cosmic bit-flips. It flags the system if readings exceed deep-mine or near-space atmospheric bounds (-40 to 85°C, 10 to 1200 mbar).
+- **I2C Bus Recovery Sequence (Feature 3):** Added `recoverI2C(sdaPin, sclPin)` to `begin()`. It bit-bangs the clock line 9 times to flush the sensor's shift register and unstick the SDA line following an unexpected microcontroller brownout or watchdog reset.
+- **Innovation Consistency Gate (Feature 4):** Upgraded `KalmanFilter` with `updateGated(measurement, sigma_gate, max_rejects)`. It dynamically calculates the Normalized Innovation Squared (NIS) to autonomously reject transient $>3\sigma$ sensor spikes without aggressively resetting the sensor, unless the anomaly persists.
+
+### Changed
+- **Diagnostic "Single Source of Truth":** Overhauled the error tracking architecture. All functions now rely exclusively on `_healthStatus`. 
+- **Pressure Output Standardization:** Standardized the `readPressure()` output to natively return raw **Pascals (Pa)** rather than millibars to align with the `performanceRead()` pipeline and user telemetry UI requirements.
+- **Async State Tracking:** Transitioned asynchronous timing checks from checking `_conversionStartTime == 0` to a dedicated `_isConverting` boolean flag, eliminating theoretical rollover or 0-millisecond boot bugs.
+
+### Fixed
+- **Critical Physics Validation Unit Mismatch:** Patched a bug where raw Pascals were being mathematically evaluated against millibar thresholds, which would have resulted in 100% false-positive rejections. Pressure is now properly scaled by `/ 100.0f` internally *before* the validation gate evaluates it.
+- **State Machine Timing Bug:** Fixed a typographical assignment error in `startPressure()` where `millis()` was accidentally assigned to `_conversionTimeout` instead of `_conversionStartTime`, which previously broke the asynchronous pressure tracking.
+- **Kalman Filter Syntax Errors:** Corrected missing brackets, missing commas, and typographical variables (e.g., `_initalized`) in `kalman_filter.h` that prevented compilation in the previous build.
+
+### Removed
+- **Legacy Error Tracking:** Deleted the transient integer `_result` and legacy `#define` error codes (`MS5611_ERROR_2`, `MS5611_ERROR_RANGE`) to reduce memory overhead and prevent conflicting states. 
+- *Note:* Backward compatibility was preserved by aliasing `getResult()` and `MS5611_READ_OK` directly to the new `STATUS_OK` bitmask system.
