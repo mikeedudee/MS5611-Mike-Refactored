@@ -2,9 +2,9 @@
 
 The MIT License
 
-  Copyright (c) 2014–2023 Korneliusz Jarzębski
-  Copyright (c) 2023–2025 Rob Tillaart
-  Copyright (c) 2025–2026 Francis “Mike” J. Camogao [Refactor/Enhancements]
+    Copyright (c) 2014–2023 Korneliusz Jarzębski
+    Copyright (c) 2025 Francis Mike John Camogao [Refactor/Enhancements]
+    Copyright (c) 2026 Francis Mike John Camogao [Added New Features, Improvements and Bug Fixes]
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -54,7 +54,7 @@ ___  ___ _____ _____  ____  __   __   ___  ____ _         ______      __        
 | |\/| | `--. \   \ \ ___ \ | |  | |  | |\/| | | |/ / _ \ |    // _ \  _/ _` |/ __| __/ _ \| '__/ _ \/ _` |
 | |  | |/\__/ /\__/ / \_/ |_| |__| |_ | |  | | |   <  __/ | |\ \  __/ || (_| | (__| || (_) | | |  __/ (_| |
 \_|  |_/\____/\____/\_____/\___/\___/ \_|  |_/_|_|\_\___| \_| \_\___|_| \__,_|\___|\__\___/|_|  \___|\__,_|
-                              LIBRARY VERSION: 1.0.8_exp_build_01082025                   
+                              LIBRARY VERSION: 1.2.5_exp_build_04126026                   
 
 */
 
@@ -67,6 +67,9 @@ ___  ___ _____ _____  ____  __   __   ___  ____ _         ______      __        
 // Custom address can be set with the second constructor
 // The mathMode can be set to either Datasheet or AppNote for different scaling methods
 MS5611::MS5611() : wire_(&Wire)
+    , spi_(nullptr)
+    , csPin_(-1)
+    , useSPI_(false)
     , address_(MS5611_ADDRESS)
     , osr_(HIGH_RES)
     , mathMode_(MathMode::Datasheet)
@@ -80,6 +83,9 @@ MS5611::MS5611() : wire_(&Wire)
 // MS5611 class constructor with custom I2C address and Wire instance
 // Allows for flexibility in using different I2C addresses and Wire ports
 MS5611::MS5611(uint8_t address, TwoWire &wirePort) : wire_(&wirePort)
+    , spi_(nullptr)
+    , csPin_(-1)
+    , useSPI_(false)
     , address_(address)
     , osr_(HIGH_RES)
     , mathMode_(MathMode::Datasheet)
@@ -90,84 +96,203 @@ MS5611::MS5611(uint8_t address, TwoWire &wirePort) : wire_(&wirePort)
     memset(cal_, 0, sizeof(cal_));
 }
 
+// NEW: Custom SPI Constructor for SPI communication 1.2.0_exp_build_02122026
+MS5611::MS5611(int8_t csPin, SPIClass &spiPort) : wire_(nullptr)
+    , spi_(&spiPort)
+    , csPin_(csPin)
+    , useSPI_(true)
+    , address_(0) // Address not used in SPI
+    , osr_(HIGH_RES)
+    , mathMode_(MathMode::Datasheet)
+    , pressureOffset_(0)
+    , temperatureOffset_(0)
+    , deviceID_(0)
+{
+    memset(cal_, 0, sizeof(cal_));
+}
+
+/// MODIFIED FOR 1.2.0_exp_build_02122026
 // Initializes the MS5611 sensor with the specified oversampling rate and math mode
 // Resets the sensor, reads calibration data, and sets the oversampling rate and math mode
-bool MS5611::begin(Oversampling osr, MathMode math) {
+bool MS5611::begin(Oversampling osr, MathMode math, int8_t sdaPin, int8_t sclPin) {
     osr_      = osr;
     mathMode_ = math;
-    wire_->begin();
+
+    if (useSPI_) {
+        // Initialize SPI Hardware
+        pinMode(csPin_, OUTPUT);
+        digitalWrite(csPin_, HIGH); // Deselect MS5611
+        spi_->begin();
+    } else {
+        // Initialize I2C Hardware
+        if (sdaPin >= 0 && sclPin >= 0) {
+            recoverI2C(sdaPin, sclPin);
+        }
+        wire_->begin();
+    }
 
     resetSensor();
-
-    if (!readCalibration()) return false;
+    if (!readCalibration()) {
+        _healthStatus |= STATUS_INIT_FAILED;
+        return false;
+    }
     return true;
 }
 
+void MS5611::recoverI2C(int8_t sdaPin, int8_t sclPin) {
+    // Set the pin to GPIO mode (dsable hardware I2c temporarily)
+    // Set the SDA to Input (High-Z) to let the line float up
+    pinMode(sdaPin, INPUT_PULLUP);
+    pinMode(sclPin, OUTPUT);
+
+        // Check if SDA is actually stuck LOW
+        // If SDA is HIGH, the bus is likely free, but still cycle anyway to be safe
+        // or we can bail out early. Fore safety, we just cycle.
+
+    // Toggle SCL 9 times to free up the bus
+    // This forces th slave to clock out any data bit it might be holding LOW 
+    for (int i = 0; i < 9; ++i) {
+        digitalWrite(sclPin, HIGH);
+        delayMicroseconds(10); // Short delay to ensure the line is held high
+        digitalWrite(sclPin, LOW);
+        delayMicroseconds(10); // Short delay to ensure the line is held low
+    }    
+
+    // Send a STOP condition manually
+    // SDA starts LOW, SCL goes HIGH, then SDA goes HIGH
+    pinMode(sdaPin, OUTPUT);
+    digitalWrite(sdaPin, LOW);
+    delayMicroseconds(10);
+
+    digitalWrite(sclPin, HIGH);
+    delayMicroseconds(10);
+
+    digitalWrite(sdaPin, HIGH); // STOP
+    delayMicroseconds(10);
+
+        // Pins will be reconfigured by wire_->begin() immediately after this
+}
+
+// Start of 1.2.0_exp_build_02122026: SPI support and asynchronous API additions
 // Reads a 16-bit register from the MS5611 sensor
 // Returns UINT16_MAX on failure, otherwise returns the 16-bit value
 uint16_t MS5611::readRegister16(uint8_t reg) const {
-    wire_->beginTransmission(address_);
-    wire_->write(reg);
-
-    if (wire_->endTransmission() != 0) return UINT16_MAX;
-
-    wire_->requestFrom(address_, (uint8_t)2);
-
-    if (wire_->available() < 2) {
-        return UINT16_MAX;
+    if (useSPI_) {
+        spi_->beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
+        digitalWrite(csPin_, LOW);
+        spi_->transfer(reg);
+        uint16_t msb = spi_->transfer(0x00);
+        uint16_t lsb = spi_->transfer(0x00);
+        digitalWrite(csPin_, HIGH);
+        spi_->endTransaction();
+        return (msb << 8) | lsb;
+    } else {
+        wire_->beginTransmission(address_);
+        wire_->write(reg);
+        if (wire_->endTransmission() != 0) {
+            const_cast<MS5611*>(this)->_healthStatus |= STATUS_BUS_ERROR;
+            return UINT16_MAX;
+        }
+        wire_->requestFrom(address_, (uint8_t)2);
+        if (wire_->available() < 2) {
+            const_cast<MS5611*>(this)->_healthStatus |= STATUS_BUS_ERROR;
+            return UINT16_MAX;
+        }
+        uint16_t msb = wire_->read();
+        uint16_t lsb = wire_->read();
+        return (msb << 8) | lsb;
     }
-
-    uint16_t msb = wire_->read();
-    uint16_t lsb = wire_->read();
-
-    return (msb << 8) | lsb;
 }
 
 uint32_t MS5611::readRegister24(uint8_t reg) const {
-    wire_->beginTransmission(address_);
-    wire_->write(reg);
+    if (useSPI_) {
+        spi_->beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
+        digitalWrite(csPin_, LOW);
+        spi_->transfer(reg);
+        uint32_t b1 = spi_->transfer(0x00);
+        uint32_t b2 = spi_->transfer(0x00);
+        uint32_t b3 = spi_->transfer(0x00);
+        digitalWrite(csPin_, HIGH);
+        spi_->endTransaction();
+        return (b1 << 16) | (b2 << 8) | b3;
+    } else {
+        wire_->beginTransmission(address_);
+        wire_->write(reg);
 
-    // Check if the transmission was successful
-    // If not, return UINT32_MAX to indicate an error
-    if (wire_->endTransmission() != 0) {
-        return UINT32_MAX;
+        // Check if the transmission was successful
+        // If not, return UINT32_MAX to indicate an error
+        if (wire_->endTransmission() != 0) {
+            const_cast<MS5611*>(this)->_healthStatus |= STATUS_BUS_ERROR;
+            return UINT32_MAX;
+        }
+
+        // Request 3 bytes from the sensor
+        // This is necessary because the MS5611 ADC value is 24 bits (3 bytes)
+        // The requestFrom function will block until the bytes are available.
+        wire_->requestFrom(address_, (uint8_t)3);
+
+        // Check if we received 3 bytes
+        // If not, return UINT32_MAX to indicate an error
+        if (wire_->available() < 3) {
+            const_cast<MS5611*>(this)->_healthStatus |= STATUS_BUS_ERROR;
+            return UINT32_MAX;
+        }
+
+        // Read the three bytes from the sensor
+        // The MS5611 ADC value is transmitted as three separate bytes
+        uint32_t b1 = wire_->read();
+        uint32_t b2 = wire_->read();
+        uint32_t b3 = wire_->read();
+
+        // Combine the three bytes into a 24-bit value
+        // MS5611 uses big-endian format, so we shift accordingly
+        // b1 is the most significant byte, followed by b2 and b3
+        // The result is a 24-bit value, which is returned as a 32-bit integer
+        // The the upper 8 bits of the 32-bit return value that are zero. 
+        // We’re filling bits 23–0 with the three ADC bytes; bits 31–24 end up zero.
+        return (b1 << 16) | (b2 << 8) | b3;
     }
-
-    // Request 3 bytes from the sensor
-    // This is necessary because the MS5611 ADC value is 24 bits (3 bytes)
-    // The requestFrom function will block until the bytes are available.
-    wire_->requestFrom(address_, (uint8_t)3);
-
-    // Check if we received 3 bytes
-    // If not, return UINT32_MAX to indicate an error
-    if (wire_->available() < 3) {
-        return UINT32_MAX;
-    }
-
-    // Read the three bytes from the sensor
-    // The MS5611 ADC value is transmitted as three separate bytes
-    uint32_t b1 = wire_->read();
-    uint32_t b2 = wire_->read();
-    uint32_t b3 = wire_->read();
-
-    // Combine the three bytes into a 24-bit value
-    // MS5611 uses big-endian format, so we shift accordingly
-    // b1 is the most significant byte, followed by b2 and b3
-    // The result is a 24-bit value, which is returned as a 32-bit integer
-    // The the upper 8 bits of the 32-bit return value that are zero. 
-    // We’re filling bits 23–0 with the three ADC bytes; bits 31–24 end up zero.
-    return (b1 << 16) | (b2 << 8) | b3;
+    
 }
+
+/// ADDED FOR 1.2.0_exp_build_02122026
+bool MS5611::validatePhysics(double temperature, float pressure) {
+    // PHYSICAL LIMIT CHECKS AND TRIGGERS
+    bool tempOk = (temperature >= MIN_TEMP_C && temperature <= MAX_TEMP_C);
+    bool presOk = (pressure >= MIN_PRESSURE_MBAR && pressure <= MAX_PRESSURE_MBAR);
+
+    // APPROACHING LIMIT CHECKS AND TRIGGERS
+    bool approachingLimits_TEMPERATURE  = (temperature >= (-30.0f) && temperature <= (75.0f));
+    bool approachingLimits_PRESSURE     = (pressure >= (100.0f) && pressure <= (1100.0f));
+
+    if (!tempOk || !presOk) {
+        _healthStatus |= STATUS_PHYSICS_VIOLATION; // Flag the error
+        return false;
+    }
+
+    if (!approachingLimits_TEMPERATURE || !approachingLimits_PRESSURE) {
+        _healthStatus |= STATUS_APPROACHING_LIMITS; // Flag the warning
+        return false;
+    }
+
+    return true;
+}
+/// END OF 1.2.0_exp_build_02122026
 
 // Resets the MS5611 sensor by sending the reset command
 // This command clears the sensor's internal state and prepares it for a fresh start
-void MS5611::resetSensor() {
-    wire_->beginTransmission(address_);
-    wire_->write(MS5611_RESET);
-    wire_->endTransmission();
-
-    // Increment the reset count to keep track of how many times the sensor has been reset
-    // This can be useful for debugging or monitoring the sensor's state
+void MS5611::resetSensor() { // UPDATED FOR 1.2.0_exp_build_02122026: Added SPI support
+    if (useSPI_) {
+        spi_->beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0)); // 1MHz
+        digitalWrite(csPin_, LOW);
+        spi_->transfer(MS5611_RESET);
+        digitalWrite(csPin_, HIGH);
+        spi_->endTransaction();
+    } else {
+        wire_->beginTransmission(address_);
+        wire_->write(MS5611_RESET);
+        wire_->endTransmission();
+    }
     ++_resetCount;
     delay(3);
 }
@@ -203,69 +328,110 @@ bool MS5611::readCalibration() {
     return true;
 }
 
+/// ADDED FOR 1.2.0_exp_build_02122026 
+// Asynchronous (Non-blocking) API implementation
+// SPI support
+bool MS5611::startTemperature() {
+    if (useSPI_) {
+        spi_->beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
+        digitalWrite(csPin_, LOW);
+        spi_->transfer(MS5611_CONVERT_D2 | uint8_t(osr_));
+        digitalWrite(csPin_, HIGH);
+        spi_->endTransaction();
+    } else {
+        wire_->beginTransmission(address_);
+        wire_->write(MS5611_CONVERT_D2 | uint8_t(osr_));
+        if (wire_->endTransmission() != 0) return false;
+    }
+
+    _conversionStartTime = millis();
+    _isConverting = true;
+    _conversionTimeout = MS5611_CONVERSION_TIMEOUT_MS[uint8_t(osr_) >> 1];
+    return true;
+}
+
+// Start a pressure conversion (D1)
+// Updated for 1.2.0_exp_build_02122026: Added SPI support and non-blocking logic
+bool MS5611::startPressure() {
+    if (useSPI_) {
+        spi_->beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
+        digitalWrite(csPin_, LOW);
+        spi_->transfer(MS5611_CONVERT_D1 | uint8_t(osr_));
+        digitalWrite(csPin_, HIGH);
+        spi_->endTransaction();
+    } else {
+        wire_->beginTransmission(address_);
+        wire_->write(MS5611_CONVERT_D1 | uint8_t(osr_));
+        if (wire_->endTransmission() != 0) return false;
+    }
+
+    _conversionStartTime = millis();
+    _isConverting = true;
+    _conversionTimeout = MS5611_CONVERSION_TIMEOUT_MS[uint8_t(osr_) >> 1];
+    return true;
+}
+
+// Check if the current conversion is complete (based on timeout)
+bool MS5611::isConversionComplete() const {
+    if (!_isConverting) {
+        return false; // No conversion started
+    }
+    return (millis() - _conversionStartTime) >= _conversionTimeout;
+}
+
+// Retrieve the results of the latest conversion (either D1 or D2)
+uint32_t MS5611::getConversionValue() {
+    _isConverting = false;
+    return readRegister24(MS5611_READ_ADC);
+}
 
 // Reads the raw temperature from the MS5611 sensor
 // This function initiates a temperature conversion and waits for the result
 uint32_t MS5611::readRawTemperature() {
-    wire_->beginTransmission(address_);
-    wire_->write(MS5611_CONVERT_D2 | uint8_t(osr_));
-    if (wire_->endTransmission() != 0) {
+    if (!startTemperature()) {
         return UINT32_MAX;
     }
 
-    uint32_t start = millis();
-    uint8_t  idx   = uint8_t(osr_) >> 1;
+    // Blocking wait using the async logic
+    while (!isConversionComplete()) {
+        yield(); // Allows other microcontrollers tasks to run background while waiting
+    }
 
-    while (millis() - start < MS5611_CONVERSION_TIMEOUT_MS[idx]) {}
-
-    return readRegister24(MS5611_READ_ADC);
+    return getConversionValue();
 }
 
 // Reads the raw pressure from the MS5611 sensor
 // This function initiates a pressure conversion and waits for the result
 uint32_t MS5611::readRawPressure() {
-    wire_->beginTransmission(address_);
-    wire_->write(MS5611_CONVERT_D1 | uint8_t(osr_));
-
-    if (wire_->endTransmission() != 0) { 
+    if (!startPressure()) {
         return UINT32_MAX;
     }
 
-    uint32_t start = millis();
-    uint8_t  idx   = uint8_t(osr_) >> 1;
+    while (!isConversionComplete()) {
+        yield();
+    }
 
-    while (millis() - start < MS5611_CONVERSION_TIMEOUT_MS[idx]) {}
-
-    return readRegister24(MS5611_READ_ADC);
+    return getConversionValue();
 }
+/// END OF 1.2.0_exp_build_02122026 
 
+/// MODIFIED FOR 1.2.0_exp_build_02122026
 // Reads the pressure from the MS5611 sensor
 // This function reads the raw pressure and temperature values, then compensates them using the calibration data
 // If `comp` is true, it applies second-order compensation for temperature effects
 // Returns the compensated pressure in millibars (mbar) or INT32_MIN on failure
 float MS5611::readPressure(bool comp) const {
+    // 1. Get Raw Data
     uint32_t D1 = const_cast<MS5611*>(this)->readRawPressure();
     uint32_t D2 = const_cast<MS5611*>(this)->readRawTemperature();
 
     if (D1 == UINT32_MAX || D2 == UINT32_MAX) { 
-        return INT32_MIN;
+        // _healthStatus is typically set by the low-level read, 
+        // but we can enforce an error here if needed.
+        return NAN;
     }
 
-    // Calculate the pressure using the calibration coefficients and raw ADC values
-    // The formula is derived from the MS5611 datasheet and includes temperature compensation
-    // D1 is the raw pressure value, D2 is the raw temperature value
-    // cal_ contains the calibration coefficients read from the sensor's PROM
-    // The calculations involve several steps:
-    // 1. Calculate dT, the difference between the raw temperature and the calibration value
-    // 2. Calculate OFF, the offset for pressure calculation
-    // 3. Calculate SENS, the sensitivity for pressure calculation
-    // 4. Calculate TEMP, the compensated temperature in hundredths of degrees Celsius
-    // 5. If compensation is requested and the temperature is below 2000°C,
-    //    apply second-order compensation to OFF and SENS
-    // 6. Finally, calculate the pressure P in millibars (mbar)
-    // The final pressure is adjusted by a user-defined offset (pressureOffset_)
-    // The result is returned as an int32_t value representing the pressure in mbar
-
+    // 2. Perform Calculation (Existing Math)
     int32_t  dT   = int32_t(D2) - (int32_t(cal_[4]) << 8);
     int64_t  OFF  = (int64_t(cal_[1]) << 16) + ((int64_t)cal_[3] * dT >> 7);
     int64_t  SENS = (int64_t(cal_[0]) << 15) + ((int64_t)cal_[2] * dT >> 8);
@@ -285,11 +451,20 @@ float MS5611::readPressure(bool comp) const {
         SENS -= sens2;
     }
 
-    int32_t P               = int32_t(((D1 * SENS >> 21) - OFF) >> 15);
-    float   pressure_final  = P  + float(pressureOffset_);
+    int32_t P = int32_t(((D1 * SENS >> 21) - OFF) >> 15);
+        float   pressure_final  = P + float(pressureOffset_);
+        
+        // Correctly scale to mbar BEFORE validation
+        float   pressure_mbar   = pressure_final / 100.0f; // optional setting and only for validation
+        
+        // --- CORRECTED VALIDATION STEP ---
+        if (pressure_mbar < MIN_PRESSURE_MBAR || pressure_mbar > MAX_PRESSURE_MBAR) {
+            const_cast<MS5611*>(this)->_healthStatus = STATUS_PHYSICS_VIOLATION;
+            return NAN; 
+        }
 
-    return pressure_final;
-}
+        return pressure_final;
+    }// END OF 1.2.0_exp_build_02122026
 
 // Reads the temperature from the MS5611 sensor
 // This function reads the raw temperature value and compensates it using the calibration data
@@ -309,8 +484,22 @@ double MS5611::readTemperature(bool comp) const {
             TEMP  -= int32_t(t2);
   }
 
-  return TEMP * 0.01 + temperatureOffset_;
+  double finalTemp = TEMP * 0.01 + temperatureOffset_;
+
+  // --- NEW VALIDATION STEP ---
+  if (finalTemp < MIN_TEMP_C || finalTemp > MAX_TEMP_C) {
+      const_cast<MS5611*>(this)->_healthStatus = STATUS_PHYSICS_VIOLATION;
+      return NAN;
+  }
+
+  // Flag the approach to the limits
+  if (finalTemp < -30.0 || finalTemp > 75.0) {
+      const_cast<MS5611*>(this)->_healthStatus = STATUS_PHYSICS_VIOLATION; 
+  }
+
+  return finalTemp;
 }
+/// END OF 1.2.0_exp_build_02122026
 
 MS5611::Measure MS5611::performanceRead(bool comp)
 {
@@ -382,12 +571,12 @@ void MS5611::spikeDetection(bool enable,
                             uint8_t consecutiveCount)
 {
     // On real enable-transition or window-size change: seed buffers & reset counters
-    if ( enable && (! _spikeWasEnabled || ringSize != _spikeRingSize) ) {
+    if ( enable && (! _spikeWasEnabled || (ringSize != _spikeRingSize)) ) {
         // clamp window
         _spikeRingSize  = constrain(ringSize, 1, SPIKE_MAX_RING);
 
         // update threshold & count
-        if (threshold > 0.0f)          _spikeThreshold   = threshold * 10.0f;
+        if (threshold > 0.0f) _spikeThreshold = threshold * 10.0f;
         _spikeConsecNeed = max<uint8_t>(1, consecutiveCount);
 
         // fetch first real sample
@@ -431,12 +620,13 @@ void MS5611::spikeDetection(bool enable,
     bool isSpike = (fabs(p - avgP) > _spikeThreshold) || (fabs(t - avgT) > _spikeThreshold);
 
     if (isSpike) {
+        _healthStatus |= STATUS_SPIKE_DETECTED; // Flag the anomaly
         incrementSpikeCounter();
 
         if (getSpikeCounter() >= _spikeConsecNeed) {
             Serial.println(F("MS5611 Spike Detected!"));
             Serial.println("Resetting sensor...");
-            delay(1000);  // give time for the user to see the message
+            //delay(1000);  // give time for the user to see the message
             resetSensor();
             resetDynamics();
             resetSpikeCounter();
@@ -480,11 +670,11 @@ uint16_t MS5611::readProm(uint8_t reg) {
   if (reg > promCRCRegister) return 0;
 
   uint8_t offset = reg * 2;
-  command(MS5611_READ_PROM + offset);
 
-  if (_result == 0) {
-    uint8_t length = 2;
-    int bytes = wire_->requestFrom(address_, length);
+  // Check the return of the command() directly
+  if (command(MS5611_READ_PROM + offset) == 0) {
+    uint8_t length  = 2;
+    int     bytes   = wire_->requestFrom(address_, length);
 
     if (bytes >= length) {
       uint16_t  value = wire_->read() * 256;
@@ -492,16 +682,14 @@ uint16_t MS5611::readProm(uint8_t reg) {
 
       return value;
     }
-
-    return 0;
   }
 
-  return 0;
+    _healthStatus |= STATUS_BUS_ERROR; // Flag the error
+    return 0;
 }
 
 uint32_t MS5611::readADC() {
-  command(MS5611_READ_ADC);
-  if (_result == 0) {
+  if (command(MS5611_READ_ADC) == 0) {
     uint8_t length  = 3;
     int     bytes   = wire_->requestFrom(address_, length);
 
@@ -512,20 +700,23 @@ uint32_t MS5611::readADC() {
 
       return value;
     }
-
-    return 0UL;
   }
-
-  return 0UL;
+  
+    _healthStatus |= STATUS_BUS_ERROR; // Flag the error
+    return 0UL;
 }
 
 int MS5611::command(const uint8_t command) {
   yield();
   wire_->beginTransmission(address_);
   wire_->write(command);
-  _result = wire_->endTransmission();
+  
+  int err = wire_->endTransmission();
+  if (err != 0) {
+    _healthStatus |= STATUS_BUS_ERROR; 
+  }
 
-  return _result;
+  return err;
 }
 
 uint16_t MS5611::getProm(uint8_t index) {

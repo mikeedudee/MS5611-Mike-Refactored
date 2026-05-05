@@ -1,6 +1,6 @@
 {
   "name": "MS5611-Mike-Refactored",
-  "keywords": "MS5611, pressure, temperature, i2c",
+  "keywords": "MS5611, pressure, temperature, i2c, SPI",
   "description": "Refactored and Enhanced version of the MS5611 Pressure & Temperature Sensor Arduino Library.",
   "repository": {
     "type": "git",
@@ -9,7 +9,7 @@
   "authors": {
     "name": "Francis Mike John Camogao"
   },
-  "version": "1.0.8_exp_build_01082025",
+  "version": "1.2.5_exp_build_04126026",
   "frameworks": "arduino",
   "platforms": "*"
 }

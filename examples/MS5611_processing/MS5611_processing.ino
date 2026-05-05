@@ -76,11 +76,11 @@ void loop()
   float     velocityKalman    = ms5611.getVelocity(medianAltitude, now);
   float     acceleKalmanedian = ms5611.getAcceleration(velocityKalman, now);
 
-  auto      performanceRead   = ms5611.performanceRead();
+  //auto      performanceRead   = ms5611.performanceRead();
   float     manualPerPres     = ms5611.getPressure();
   float     manualPerTemp     = ms5611.getTemperature();
 
-  ms5611.spikeDetection(true);
+  ms5611.spikeDetection(true, 5, 10);
 
   /*// Read true temperature & Pressure (with compensation)
   double    realTemperature2  = ms5611.getTemperature();
@@ -90,7 +90,7 @@ void loop()
 
   double first[]   = {realTemperature, manualPerPres, realPressure, manualPerTemp, realAltitude, medianAltitude, kalmanAltitude, 
   velocityMedian, velocityKalman, velocityNormal,
-  acceleMedian, acceleKalmanedian, accelNormal};
+  acceleMedian, acceleKalmanedian, accelNormal, ms5611.getSpikeCounter(), ms5611.getResetCount()};
   //double second[4]  = {realTemperature2, realPressure2, realAltitude2, filteredAltitude2}; 
 
   // Number of pairs
